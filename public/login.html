@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - CEASA</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #e9f7ef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-box {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 300px;
+    }
+    .login-box h2 { color: #2e7d32; margin-bottom: 20px; }
+    .login-box input {
+      width: 100%; padding: 10px; margin: 10px 0;
+      border: 1px solid #ccc; border-radius: 6px;
+    }
+    .login-box button {
+      width: 100%; padding: 10px;
+      background: #2e7d32; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer;
+    }
+    .login-box button:hover { background: #1b5e20; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>Login</h2>
+    <form method="post" action="/login">
+      <input type="text" name="usuario" placeholder="Usuário ou CNPJ" required>
+      <input type="password" name="senha" placeholder="Senha" required>
+      <button type="submit">Entrar</button>
+    </form>
+  </div>
+</body>
+</html>
