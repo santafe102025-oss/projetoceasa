@@ -1,144 +1,157 @@
-require("dotenv").config();
-const express = require("express");
-const session = require("express-session");
-const multer = require("multer");
-const path = require("path");
-const { createClient } = require("@supabase/supabase-js");
-const Database = require("better-sqlite3");
+import express from "express";
+import session from "express-session";
+import multer from "multer";
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
+import path from "path";
+import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
-// Inicializa o banco
-const db = new Database("./database.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Cria tabelas se não existirem
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS empresas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT,
-    cnpj TEXT UNIQUE,
-    senha TEXT,
-    box TEXT
-  )
-`).run();
-
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS arquivos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa_id INTEGER,
-    nome TEXT,
-    caminho TEXT,
-    FOREIGN KEY (empresa_id) REFERENCES empresas(id)
-  )
-`).run();
-
-// Supabase
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Express
 const app = express();
-app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  session({
-    secret: "segredo",
-    resave: false,
-    saveUninitialized: false,
-  })
+
+// 🔑 Sessões
+app.use(session({
+  secret: "chave-secreta",
+  resave: false,
+  saveUninitialized: false,
+}));
+
+// 📂 Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
 );
-app.use(express.static("public"));
 
-// Configuração do Multer
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
-// Middleware de autenticação
-function authMiddleware(req, res, next) {
-  if (!req.session.userId) {
-    return res.redirect("/login.html");
-  }
-  next();
-}
-
-// Rotas
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
+// 📂 Banco SQLite
+const db = await open({
+  filename: "banco.db",
+  driver: sqlite3.Database,
 });
 
-// Login
-app.post("/login", (req, res) => {
+// cria tabelas se não existirem
+await db.exec(`
+CREATE TABLE IF NOT EXISTS empresas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT,
+  cnpj TEXT UNIQUE,
+  box TEXT,
+  email TEXT,
+  senha TEXT
+);
+
+CREATE TABLE IF NOT EXISTS arquivos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  nome TEXT,
+  caminho TEXT,
+  FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+);
+`);
+
+// ⬆️ Upload com multer (temporário antes de mandar p/ supabase)
+const upload = multer({ dest: "uploads/" });
+
+// 🔹 Rotas de páginas
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/", (req, res) => res.redirect("/login.html"));
+
+// 🔹 Cadastro
+app.post("/cadastro", async (req, res) => {
+  const { empresa, cnpj, box, email, senha } = req.body;
+  try {
+    await db.run(
+      "INSERT INTO empresas (nome, cnpj, box, email, senha) VALUES (?, ?, ?, ?, ?)",
+      [empresa, cnpj, box, email, senha]
+    );
+    res.redirect("/login.html");
+  } catch (err) {
+    console.error("Erro cadastro:", err);
+    res.send("Erro ao cadastrar: " + err.message);
+  }
+});
+
+// 🔹 Login
+app.post("/login", async (req, res) => {
   const { cnpj, senha } = req.body;
-  const empresa = db.prepare("SELECT * FROM empresas WHERE cnpj = ? AND senha = ?").get(cnpj, senha);
-
-  if (empresa) {
-    req.session.userId = empresa.id;
-    req.session.cnpj = empresa.cnpj;
-    res.redirect("/dashboard.html");
-  } else {
-    res.send("CNPJ ou senha inválidos");
+  if (cnpj === "admin" && senha === "admin") {
+    req.session.admin = true;
+    return res.redirect("/admin.html");
   }
+
+  const empresa = await db.get("SELECT * FROM empresas WHERE cnpj=? AND senha=?", [cnpj, senha]);
+  if (empresa) {
+    req.session.empresa = empresa;
+    return res.redirect("/empresa.html");
+  }
+
+  res.send("CNPJ ou senha incorretos");
 });
 
-// Upload de arquivos pelo admin
-app.post("/upload/:empresaId", upload.single("arquivo"), async (req, res) => {
-  const { empresaId } = req.params;
-  const empresa = db.prepare("SELECT * FROM empresas WHERE id = ?").get(empresaId);
+// 🔹 Logout
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/login.html");
+  });
+});
 
-  if (!empresa) {
-    return res.status(400).send("Empresa não encontrada");
-  }
+// 🔹 Lista de empresas para admin (AJAX)
+app.get("/admin/empresas", async (req, res) => {
+  if (!req.session.admin) return res.status(403).send("Não autorizado");
+  const empresas = await db.all("SELECT * FROM empresas");
+  res.json(empresas);
+});
 
+// 🔹 Upload de arquivos pelo admin
+app.post("/admin/upload", upload.single("arquivo"), async (req, res) => {
+  if (!req.session.admin) return res.status(403).send("Não autorizado");
+
+  const empresaId = req.body.empresa;
   const arquivo = req.file;
-  const nomeArquivo = arquivo.originalname;
-  const caminho = `${empresa.cnpj}/${nomeArquivo}`;
 
-  // Faz upload para Supabase (com replace = true)
+  // envia para supabase
   const { error } = await supabase.storage
     .from("arquivos")
-    .upload(caminho, arquivo.buffer, {
+    .upload(`${empresaId}/${arquivo.originalname}`, arquivo.buffer, {
+      upsert: true,
       contentType: arquivo.mimetype,
-      upsert: true
     });
 
   if (error) {
-    console.error("Erro no upload:", error.message);
-    return res.status(500).send("Erro no upload");
+    console.error("Erro upload supabase:", error.message);
+    return res.send("Erro ao enviar arquivo");
   }
 
-  // Salva no banco
-  db.prepare(
-    "INSERT INTO arquivos (empresa_id, nome, caminho) VALUES (?, ?, ?)"
-  ).run(empresaId, nomeArquivo, caminho);
+  await db.run(
+    "INSERT OR REPLACE INTO arquivos (empresa_id, nome, caminho) VALUES (?, ?, ?)",
+    [empresaId, arquivo.originalname, `${empresaId}/${arquivo.originalname}`]
+  );
 
-  res.send("Arquivo enviado com sucesso!");
+  res.redirect("/admin.html");
 });
 
-// Listar arquivos da empresa logada
-app.get("/meus-arquivos", authMiddleware, async (req, res) => {
-  const empresaId = req.session.userId;
-  const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(empresaId);
+// 🔹 Lista de arquivos da empresa
+app.get("/empresa/arquivos", async (req, res) => {
+  if (!req.session.empresa) return res.status(403).send("Não autorizado");
 
-  // Gera URLs públicas temporárias
-  const listaComUrls = [];
-  for (const arq of arquivos) {
-    const { data, error } = await supabase.storage
-      .from("arquivos")
-      .createSignedUrl(arq.caminho, 60 * 60); // válido 1h
+  const arquivos = await db.all("SELECT * FROM arquivos WHERE empresa_id=?", [req.session.empresa.id]);
 
-    if (!error) {
-      listaComUrls.push({ nome: arq.nome, url: data.signedUrl });
-    }
-  }
+  // gera links públicos
+  const result = await Promise.all(
+    arquivos.map(async (a) => {
+      const { data } = await supabase.storage.from("arquivos").getPublicUrl(a.caminho);
+      return { ...a, url: data.publicUrl };
+    })
+  );
 
-  res.json(listaComUrls);
+  res.json(result);
 });
 
-// Logout
-app.get("/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect("/login.html");
-});
 
-// Inicia servidor
+// 🚀 Start
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log("Servidor rodando na porta " + PORT));

@@ -1,18 +1,25 @@
 {
   "name": "projetoceasa",
   "version": "1.0.0",
+  "description": "Sistema CEASA com Supabase e Postgres no Render",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.0",
-    "body-parser": "^1.20.2",
-    "dotenv": "^16.4.5",
-    "ejs": "^3.1.9",
+    "@supabase/supabase-js": "^2.39.7",
+    "connect-pg-simple": "^9.0.0",
+    "dotenv": "^16.3.1",
     "express": "^4.19.2",
     "express-session": "^1.17.3",
-    "@supabase/supabase-js": "^2.39.6",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^2.0.0",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "nodemon": "^3.1.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12"
   }
 }
