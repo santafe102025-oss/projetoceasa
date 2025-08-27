@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: projetoceasa
+    env: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production

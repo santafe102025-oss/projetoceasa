@@ -1,232 +1,144 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const bcrypt = require("bcrypt");
 const multer = require("multer");
-const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
+const Database = require("better-sqlite3");
 
-const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+// Inicializa o banco
+const db = new Database("./database.db");
 
-// ===================== SUPABASE =====================
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// ===================== BANCO DE DADOS =====================
-const db = new sqlite3.Database("./banco.db");
-
-db.serialize(() => {
-  // Criar tabela empresas
-  db.run(`CREATE TABLE IF NOT EXISTS empresas (
+// Cria tabelas se não existirem
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS empresas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cnpj TEXT UNIQUE,
     nome TEXT,
-    box TEXT,
-    usuario TEXT,
-    senha TEXT
-  )`);
+    cnpj TEXT UNIQUE,
+    senha TEXT,
+    box TEXT
+  )
+`).run();
 
-  // Criar tabela arquivos
-  db.run(`CREATE TABLE IF NOT EXISTS arquivos (
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS arquivos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     empresa_id INTEGER,
     nome TEXT,
-    caminho TEXT
-  )`);
+    caminho TEXT,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+  )
+`).run();
 
-  // Verificar se "caminho" existe, se não, adicionar
-  db.all(`PRAGMA table_info(arquivos);`, (err, columns) => {
-    if (err) return console.error(err.message);
-    const colNames = columns.map(c => c.name);
-    if (!colNames.includes("caminho")) {
-      db.run(`ALTER TABLE arquivos ADD COLUMN caminho TEXT`, (err) => {
-        if (err) {
-          console.error("Erro ao adicionar coluna 'caminho':", err.message);
-        } else {
-          console.log("✅ Coluna 'caminho' adicionada com sucesso!");
-        }
-      });
-    }
-  });
-});
+// Supabase
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// ===================== CONFIGURAÇÃO =====================
+// Express
+const app = express();
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
 app.use(
   session({
     secret: "segredo",
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
   })
 );
+app.use(express.static("public"));
 
-// ===================== VARIÁVEIS =====================
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "1234";
+// Configuração do Multer
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-// ===================== ROTAS =====================
+// Middleware de autenticação
+function authMiddleware(req, res, next) {
+  if (!req.session.userId) {
+    return res.redirect("/login.html");
+  }
+  next();
+}
+
+// Rotas
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public/login.html"));
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
+// Login
 app.post("/login", (req, res) => {
-  const { usuario, senha } = req.body;
+  const { cnpj, senha } = req.body;
+  const empresa = db.prepare("SELECT * FROM empresas WHERE cnpj = ? AND senha = ?").get(cnpj, senha);
 
-  if (usuario === ADMIN_USER && senha === ADMIN_PASS) {
-    req.session.admin = true;
-    return res.redirect("/admin");
+  if (empresa) {
+    req.session.userId = empresa.id;
+    req.session.cnpj = empresa.cnpj;
+    res.redirect("/dashboard.html");
+  } else {
+    res.send("CNPJ ou senha inválidos");
+  }
+});
+
+// Upload de arquivos pelo admin
+app.post("/upload/:empresaId", upload.single("arquivo"), async (req, res) => {
+  const { empresaId } = req.params;
+  const empresa = db.prepare("SELECT * FROM empresas WHERE id = ?").get(empresaId);
+
+  if (!empresa) {
+    return res.status(400).send("Empresa não encontrada");
   }
 
-  db.get(
-    "SELECT * FROM empresas WHERE (cnpj = ? OR usuario = ?)",
-    [usuario, usuario],
-    async (err, empresa) => {
-      if (err || !empresa) return res.send("Usuário não encontrado.");
-      const ok = await bcrypt.compare(senha, empresa.senha);
-      if (!ok) return res.send("Senha incorreta.");
-      req.session.empresa = empresa;
-      res.redirect("/empresa");
-    }
-  );
-});
-
-// ===================== ADMIN =====================
-app.get("/admin", (req, res) => {
-  if (!req.session.admin) return res.redirect("/");
-
-  db.all("SELECT * FROM empresas", (err, empresas) => {
-    if (err) return res.send("Erro no banco.");
-    let html = `
-      <h1>Painel do Administrador</h1>
-      <form method="get" action="/logout"><button>Sair</button></form>
-      <h2>Empresas</h2>
-      <form method="get" action="/cadastro"><button>Cadastrar Empresa</button></form>
-      <br><br>
-      <form method="get" action="/admin">
-        <input type="text" name="filtro" placeholder="Buscar por CNPJ, Nome ou Box">
-        <button type="submit">Filtrar</button>
-      </form>
-      <br>
-    `;
-
-    const filtro = req.query.filtro ? req.query.filtro.toLowerCase() : null;
-    empresas
-      .filter(
-        (e) =>
-          !filtro ||
-          e.cnpj.toLowerCase().includes(filtro) ||
-          e.nome.toLowerCase().includes(filtro) ||
-          e.box.toLowerCase().includes(filtro)
-      )
-      .forEach((e) => {
-        html += `
-          <div style="border:1px solid #ccc; margin:5px; padding:5px">
-            <b>${e.nome}</b> - CNPJ: ${e.cnpj} - Box: ${e.box}
-            <form method="post" action="/upload/${e.id}" enctype="multipart/form-data">
-              <input type="file" name="arquivo" required>
-              <button type="submit">Enviar PDF</button>
-            </form>
-          </div>`;
-      });
-
-    res.send(html);
-  });
-});
-
-// Upload de arquivos (admin escolhe empresa)
-app.post("/upload/:empresaId", upload.single("arquivo"), async (req, res) => {
-  if (!req.session.admin) return res.redirect("/");
-
-  const empresaId = req.params.empresaId;
   const arquivo = req.file;
+  const nomeArquivo = arquivo.originalname;
+  const caminho = `${empresa.cnpj}/${nomeArquivo}`;
 
-  if (!arquivo) return res.send("Nenhum arquivo enviado.");
+  // Faz upload para Supabase (com replace = true)
+  const { error } = await supabase.storage
+    .from("arquivos")
+    .upload(caminho, arquivo.buffer, {
+      contentType: arquivo.mimetype,
+      upsert: true
+    });
 
-  db.get("SELECT * FROM empresas WHERE id = ?", [empresaId], async (err, empresa) => {
-    if (err || !empresa) return res.send("Empresa não encontrada.");
+  if (error) {
+    console.error("Erro no upload:", error.message);
+    return res.status(500).send("Erro no upload");
+  }
 
-    const filePathSupabase = `${empresa.cnpj}/${arquivo.originalname}`;
+  // Salva no banco
+  db.prepare(
+    "INSERT INTO arquivos (empresa_id, nome, caminho) VALUES (?, ?, ?)"
+  ).run(empresaId, nomeArquivo, caminho);
 
-    // Upload para Supabase com substituição
-    const { error } = await supabase.storage
+  res.send("Arquivo enviado com sucesso!");
+});
+
+// Listar arquivos da empresa logada
+app.get("/meus-arquivos", authMiddleware, async (req, res) => {
+  const empresaId = req.session.userId;
+  const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(empresaId);
+
+  // Gera URLs públicas temporárias
+  const listaComUrls = [];
+  for (const arq of arquivos) {
+    const { data, error } = await supabase.storage
       .from("arquivos")
-      .upload(filePathSupabase, arquivo.buffer, {
-        contentType: "application/pdf",
-        upsert: true, // 🔹 substitui se já existir
-      });
+      .createSignedUrl(arq.caminho, 60 * 60); // válido 1h
 
-    if (error) {
-      console.error("Erro no upload:", error);
-      return res.send("❌ Erro no upload: " + error.message);
+    if (!error) {
+      listaComUrls.push({ nome: arq.nome, url: data.signedUrl });
     }
+  }
 
-    db.run(
-      "INSERT INTO arquivos (empresa_id, nome, caminho) VALUES (?, ?, ?) ",
-      [empresa.id, arquivo.originalname, filePathSupabase],
-      (err) => {
-        if (err) console.error("Erro no banco:", err.message);
-      }
-    );
-
-    res.send("✅ Arquivo enviado com sucesso!");
-  });
+  res.json(listaComUrls);
 });
 
-// ===================== EMPRESAS =====================
-app.get("/empresa", (req, res) => {
-  if (!req.session.empresa) return res.redirect("/");
-
-  db.all(
-    "SELECT * FROM arquivos WHERE empresa_id = ?",
-    [req.session.empresa.id],
-    async (err, arquivos) => {
-      if (err) return res.send("Erro no banco.");
-
-      let html = `<h1>Área da Empresa - ${req.session.empresa.nome}</h1>
-      <form method="get" action="/logout"><button>Sair</button></form>
-      <h2>Meus Arquivos</h2>`;
-
-      for (let arq of arquivos) {
-        const { data } = await supabase.storage
-          .from("arquivos")
-          .createSignedUrl(arq.caminho, 60 * 60); // válido por 1h
-        html += `<p><a href="${data.signedUrl}" target="_blank">${arq.nome}</a></p>`;
-      }
-
-      if (arquivos.length === 0) html += "<p>Nenhum arquivo disponível.</p>";
-
-      res.send(html);
-    }
-  );
-});
-
-// ===================== CADASTRO DE EMPRESAS =====================
-app.get("/cadastro", (req, res) => {
-  if (!req.session.admin) return res.redirect("/");
-  res.sendFile(path.join(__dirname, "public/cadastro.html"));
-});
-
-app.post("/cadastro", async (req, res) => {
-  const { cnpj, nome, box, usuario, senha } = req.body;
-  const hash = await bcrypt.hash(senha, 10);
-
-  db.run(
-    "INSERT INTO empresas (cnpj, nome, box, usuario, senha) VALUES (?, ?, ?, ?, ?)",
-    [cnpj, nome, box, usuario, hash],
-    (err) => {
-      if (err) return res.send("Erro ao cadastrar: " + err.message);
-      res.redirect("/admin");
-    }
-  );
-});
-
-// ===================== LOGOUT =====================
+// Logout
 app.get("/logout", (req, res) => {
   req.session.destroy();
-  res.redirect("/");
+  res.redirect("/login.html");
 });
 
-// ===================== INICIAR SERVIDOR =====================
-app.listen(3000, () => console.log("🚀 Servidor rodando em http://localhost:3000"));
+// Inicia servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
