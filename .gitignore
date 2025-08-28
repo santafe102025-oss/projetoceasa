@@ -1,2 +1,28 @@
+# Node.js
 node_modules/
+npm-debug.log
+yarn-error.log
+
+# Ambiente
 .env
+.DS_Store
+
+# Logs
+logs
+*.log
+logs/*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage e build
+coverage/
+dist/
+build/
+.cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
