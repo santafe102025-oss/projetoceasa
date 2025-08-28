@@ -2,85 +2,73 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Painel da Empresa</title>
-  <script src="/config.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #006400, #228B22);
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 700px;
-      margin: 50px auto;
-      background: white;
-      color: black;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    h1 {
-      color: #006400;
-      margin-bottom: 20px;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-    }
-    li {
-      margin: 10px 0;
-    }
-    a {
-      color: #006400;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .btn {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 10px 20px;
-      background: #006400;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    .btn:hover {
-      background: #228B22;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel da Empresa - CEASA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <h1>Painel da Empresa</h1>
-    <p>Aqui estão seus arquivos disponíveis para download:</p>
-    <ul id="listaArquivos"></ul>
-    <a href="/logout" class="btn">Sair</a>
-  </div>
+<body class="bg-green-50 min-h-screen flex flex-col">
 
+  <!-- Header -->
+  <header class="bg-green-700 text-white shadow-md">
+    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
+      <h1 class="text-2xl font-bold">🌱 CEASA</h1>
+      <nav class="space-x-4">
+        <a href="/logout" class="hover:underline">Sair</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Conteúdo principal -->
+  <main class="flex-1 max-w-5xl mx-auto mt-8 p-6 bg-white shadow-lg rounded-2xl">
+    <h2 class="text-2xl font-semibold text-green-700 mb-6">📂 Arquivos da sua empresa</h2>
+
+    <!-- Lista de arquivos -->
+    <div id="lista-arquivos" class="space-y-4">
+      <p class="text-gray-500">Carregando arquivos...</p>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-green-700 text-white text-center p-4 mt-12">
+    <p>© 2025 CEASA - Sistema de Empresas</p>
+  </footer>
+
+  <!-- Script para buscar os arquivos -->
   <script>
-    fetch('/api/arquivos')
-      .then(res => res.json())
-      .then(data => {
-        const lista = document.getElementById('listaArquivos');
-        lista.innerHTML = '';
-        if (data.length === 0) {
-          lista.innerHTML = '<li>Nenhum arquivo disponível.</li>';
-        } else {
-          data.forEach(a => {
-            const li = document.createElement('li');
-            li.innerHTML = `<a href="${window.SUPABASE_URL}/storage/v1/object/public/arquivos/${a.caminho}" target="_blank">${a.nome}</a>`;
-            lista.appendChild(li);
-          });
+    async function carregarArquivos() {
+      try {
+        const res = await fetch("/arquivos");
+        if (!res.ok) throw new Error("Erro ao carregar arquivos");
+
+        const arquivos = await res.json();
+        const lista = document.getElementById("lista-arquivos");
+        lista.innerHTML = "";
+
+        if (arquivos.length === 0) {
+          lista.innerHTML = "<p class='text-gray-500'>Nenhum arquivo disponível no momento.</p>";
+          return;
         }
-      });
+
+        arquivos.forEach(arq => {
+          const item = document.createElement("div");
+          item.className = "flex items-center justify-between bg-gray-100 p-4 rounded-lg shadow";
+          item.innerHTML = `
+            <span class="text-gray-700 font-medium">${arq.nome}</span>
+            <a href="${arq.url}" target="_blank" 
+               class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+               Baixar
+            </a>
+          `;
+          lista.appendChild(item);
+        });
+      } catch (err) {
+        document.getElementById("lista-arquivos").innerHTML =
+          "<p class='text-red-500'>Erro ao carregar arquivos.</p>";
+      }
+    }
+
+    carregarArquivos();
   </script>
+
 </body>
 </html>
