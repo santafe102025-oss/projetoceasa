@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const bodyParser = require("body-parser");
-const bcrypt = require("bcryptjs"); // <- substitui bcrypt por bcryptjs
+const bcrypt = require('bcryptjs'); // <- substitui bcrypt por bcryptjs
 const { createClient } = require("@supabase/supabase-js");
 const Database = require("better-sqlite3"); // <- substitui sqlite3 por better-sqlite3
 const path = require("path");
