@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - CEASA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-green-50 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-green-700 text-white shadow-md">
+    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
+      <h1 class="text-2xl font-bold">🌱 CEASA - Dashboard</h1>
+      <a href="/login.html" class="bg-white text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-100">Sair</a>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="flex-grow max-w-6xl mx-auto mt-8 p-6 bg-white shadow-lg rounded-2xl">
+    <h2 class="text-xl font-semibold text-green-700 mb-6">Bem-vindo ao Sistema CEASA</h2>
+
+    <p class="mb-4 text-gray-700">
+      Aqui você pode gerenciar empresas e acessar arquivos disponibilizados pelo administrador.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="p-4 border rounded-lg shadow-sm hover:shadow-md">
+        <h3 class="font-semibold text-green-700 mb-2">Empresas Cadastradas</h3>
+        <p class="text-sm text-gray-600">Visualizar e filtrar por CNPJ, nome ou box.</p>
+      </div>
+      <div class="p-4 border rounded-lg shadow-sm hover:shadow-md">
+        <h3 class="font-semibold text-green-700 mb-2">Arquivos</h3>
+        <p class="text-sm text-gray-600">Baixar os documentos enviados pelo administrador.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-green-700 text-white text-center p-4 mt-12">
+    <p>© 2025 CEASA - Sistema de Empresas</p>
+  </footer>
+</body>
+</html>

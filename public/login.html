@@ -2,41 +2,31 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Login - Sistema CEASA</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #006400, #228B22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      text-align: center;
-      max-width: 400px;
-      width: 100%;
-    }
-    h1 {
-      color: #006400;
-      margin-bottom: 20px;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      background: #006400;
-      color: white;
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - CEASA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-green-50 flex items-center justify-center h-screen">
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+    <h2 class="text-2xl font-bold text-green-700 text-center mb-6">🌱 CEASA - Login</h2>
+    
+    <form action="/dashboard" method="GET" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">E-mail</label>
+        <input type="email" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300" required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Senha</label>
+        <input type="password" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300" required>
+      </div>
+      <button type="submit" class="w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700">
+        Entrar
+      </button>
+    </form>
+
+    <p class="text-center mt-4 text-sm text-gray-600">
+      Não tem conta? <a href="/index.html" class="text-green-700 font-semibold hover:underline">Cadastre-se</a>
+    </p>
+  </div>
+</body>
+</html>
