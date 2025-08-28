@@ -212,6 +212,28 @@ app.get("/arquivos", authMiddleware, async (req, res) => {
 });
 
 // ======================
+// LISTAR EMPRESAS (para admin)
+// ======================
+app.get("/empresas.json", adminMiddleware, (req, res) => {
+  try {
+    const empresas = db.prepare("SELECT id, nome, cnpj, box FROM empresas").all();
+    res.json(empresas);
+  } catch (err) {
+    console.error("Erro ao listar empresas:", err.message);
+    res.status(500).send("Erro ao buscar empresas.");
+  }
+});
+
+// Excluir empresa
+app.delete('/empresas/:id', (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM empresas WHERE id = ?", [id], function (err) {
+    if (err) return res.status(500).send("Erro ao excluir empresa");
+    res.send("Empresa excluída com sucesso");
+  });
+});
+
+// ======================
 // LOGOUT
 // ======================
 app.get("/logout", (req, res) => {

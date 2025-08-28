@@ -50,6 +50,7 @@
             <th class="border px-3 py-2">CNPJ</th>
             <th class="border px-3 py-2">Box</th>
             <th class="border px-3 py-2">Email</th>
+            <th class="border px-3 py-2">Ações</th>
           </tr>
         </thead>
         <tbody id="tabelaEmpresas"></tbody>
@@ -60,7 +61,7 @@
   <script>
     // Carregar empresas no select e na tabela
     async function carregarEmpresas() {
-      const res = await fetch('/empresas');
+      const res = await fetch('/empresas.json'); // rota corrigida
       const empresas = await res.json();
 
       // Preencher select
@@ -83,12 +84,32 @@
             <td class="border px-3 py-2">${e.nome}</td>
             <td class="border px-3 py-2">${e.cnpj}</td>
             <td class="border px-3 py-2">${e.box}</td>
-            <td class="border px-3 py-2">${e.email}</td>
+            <td class="border px-3 py-2">${e.email || ''}</td>
+            <td class="border px-3 py-2 text-center">
+              <button 
+                onclick="excluirEmpresa(${e.id})"
+                class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 text-xs">
+                Excluir
+              </button>
+            </td>
           </tr>
         `;
       });
     }
     carregarEmpresas();
+
+    // Função para excluir empresa
+    async function excluirEmpresa(id) {
+      if (!confirm("Tem certeza que deseja excluir esta empresa?")) return;
+
+      const resp = await fetch(`/empresas/${id}`, { method: "DELETE" });
+      if (resp.ok) {
+        alert("Empresa excluída com sucesso!");
+        carregarEmpresas();
+      } else {
+        alert("Erro ao excluir empresa.");
+      }
+    }
 
     // Upload de arquivo
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
