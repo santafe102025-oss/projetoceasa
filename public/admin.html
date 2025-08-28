@@ -2,25 +2,110 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Painel Administrador - Ceasa</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Painel do Administrador</title>
+  <script src="/config.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #006400, #228B22);
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      background: white;
+      color: black;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #006400;
+      margin-bottom: 20px;
+    }
+    select, input, button {
+      margin: 10px 5px;
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #006400;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #228B22;
+    }
+    .btn-sair {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #006400;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      text-decoration: none;
+    }
+    .btn-sair:hover {
+      background: #228B22;
+    }
+  </style>
 </head>
-<body class="bg-green-50 min-h-screen">
-  <header class="bg-green-700 text-white p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold">Painel do Administrador</h1>
-    <a href="/login.html" class="bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600">Sair</a>
-  </header>
+<body>
+  <div class="container">
+    <h1>Painel do Administrador</h1>
 
-  <main class="p-8">
-    <h2 class="text-lg font-bold text-green-700 mb-4">Selecionar Empresa</h2>
-    <form action="/admin/upload" method="POST" enctype="multipart/form-data" class="space-y-4">
-      <select name="empresa" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-400">
-        <option>Selecione a empresa...</option>
-        <!-- Aqui virá a lista dinâmica das empresas -->
-      </select>
-      <input type="file" name="arquivo" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-400">
-      <button type="submit" class="bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700">Enviar Arquivo</button>
+    <h3>Enviar arquivo para empresa</h3>
+    <form id="uploadForm">
+      <select id="empresaSelect" required></select>
+      <input type="file" id="arquivo" required>
+      <button type="submit">Enviar</button>
     </form>
-  </main>
+
+    <a href="/logout" class="btn-sair">Sair</a>
+  </div>
+
+  <script>
+    async function carregarEmpresas() {
+      const res = await fetch('/empresas.json'); // você pode criar essa rota para listar empresas
+      const empresas = await res.json();
+      const select = document.getElementById('empresaSelect');
+      empresas.forEach(e => {
+        const option = document.createElement('option');
+        option.value = e.id;
+        option.textContent = `${e.nome} - CNPJ: ${e.cnpj} - Box: ${e.box}`;
+        select.appendChild(option);
+      });
+    }
+    carregarEmpresas();
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const empresaId = document.getElementById('empresaSelect').value;
+      const file = document.getElementById('arquivo').files[0];
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const conteudoBase64 = reader.result.split(',')[1];
+        await fetch('/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            empresaId,
+            nomeArquivo: file.name,
+            conteudo: conteudoBase64
+          })
+        });
+        alert('Arquivo enviado com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
 </body>
 </html>
