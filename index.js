@@ -2,9 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const bodyParser = require("body-parser");
-const bcrypt = require('bcryptjs'); // <- substitui bcrypt por bcryptjs
+const bcrypt = require("bcryptjs");
 const { createClient } = require("@supabase/supabase-js");
-const Database = require("better-sqlite3"); // <- substitui sqlite3 por better-sqlite3
+const Database = require("better-sqlite3");
 const path = require("path");
 
 const app = express();
@@ -51,14 +51,28 @@ app.use(
 // Middleware de autenticação
 function authMiddleware(req, res, next) {
   if (!req.session.userId) {
-    return res.redirect("/login.html");
+    return res.redirect("/login");
   }
   next();
 }
 
-// Rotas
+// ======================
+// ROTAS
+// ======================
+
+// Página inicial -> redireciona para login
 app.get("/", (req, res) => {
+  res.redirect("/login");
+});
+
+// rota GET para exibir a página de login
+app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// Página da empresa (somente logado)
+app.get("/empresa", authMiddleware, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "empresa.html"));
 });
 
 // Cadastro de empresa
@@ -66,9 +80,11 @@ app.post("/cadastro", async (req, res) => {
   const { nome, cnpj, box, email, senha } = req.body;
   try {
     const hash = await bcrypt.hash(senha, 10);
-    db.prepare("INSERT INTO empresas (nome, cnpj, box, email, senha) VALUES (?, ?, ?, ?, ?)")
-      .run(nome, cnpj, box, email, hash);
-    res.redirect("/login.html");
+    db.prepare(
+      "INSERT INTO empresas (nome, cnpj, box, email, senha) VALUES (?, ?, ?, ?, ?)"
+    ).run(nome, cnpj, box, email, hash);
+
+    res.redirect("/login");
   } catch (err) {
     console.error("Erro no cadastro:", err.message);
     res.status(500).send("Erro ao cadastrar empresa.");
@@ -80,10 +96,10 @@ app.post("/login", async (req, res) => {
   const { email, senha } = req.body;
   try {
     const empresa = db.prepare("SELECT * FROM empresas WHERE email = ?").get(email);
-    if (empresa && await bcrypt.compare(senha, empresa.senha)) {
+    if (empresa && (await bcrypt.compare(senha, empresa.senha))) {
       req.session.userId = empresa.id;
       req.session.cnpj = empresa.cnpj;
-      res.redirect("/empresa.html");
+      res.redirect("/empresa");
     } else {
       res.status(401).send("Credenciais inválidas.");
     }
@@ -107,10 +123,12 @@ app.post("/upload/:empresaId", async (req, res) => {
     const bucket = "arquivos";
     const caminho = `${empresa.cnpj}/${nomeArquivo}`;
 
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(caminho, Buffer.from(conteudo, "base64"), {
-      contentType: "application/pdf",
-      upsert: true, // <- substitui automaticamente se já existir
-    });
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(caminho, Buffer.from(conteudo, "base64"), {
+        contentType: "application/pdf",
+        upsert: true,
+      });
 
     if (uploadError) {
       console.error("Erro no upload:", uploadError.message);
@@ -127,14 +145,17 @@ app.post("/upload/:empresaId", async (req, res) => {
   }
 });
 
-// Listagem de arquivos para a empresa
+// Listagem de arquivos para a empresa logada
 app.get("/arquivos", authMiddleware, async (req, res) => {
   try {
     const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(req.session.userId);
 
     const arquivosComUrls = await Promise.all(
       arquivos.map(async (arquivo) => {
-        const { data, error } = await supabase.storage.from("arquivos").createSignedUrl(arquivo.caminho, 60 * 60);
+        const { data, error } = await supabase.storage
+          .from("arquivos")
+          .createSignedUrl(arquivo.caminho, 60 * 60);
+
         return {
           ...arquivo,
           url: data?.signedUrl || null,
@@ -151,8 +172,9 @@ app.get("/arquivos", authMiddleware, async (req, res) => {
 
 // Logout
 app.get("/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect("/login.html");
+  req.session.destroy(() => {
+    res.redirect("/login");
+  });
 });
 
 // Inicializa servidor

@@ -3,57 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CEASA - Sistema de Empresas</title>
-  <!-- Tailwind via CDN -->
+  <title>CEASA - Bem-vindo</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-green-50 text-gray-800">
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
 
-  <!-- Header -->
-  <header class="bg-green-700 text-white shadow-md">
-    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
-      <h1 class="text-2xl font-bold">🌱 CEASA</h1>
-      <nav class="space-x-4">
-        <a href="/" class="hover:underline">Início</a>
-        <a href="/login" class="hover:underline">Login</a>
-      </nav>
+  <div class="bg-white shadow-2xl rounded-2xl max-w-lg w-full p-10 text-center">
+    <!-- Logo -->
+    <h1 class="text-4xl font-bold text-green-700 mb-4">🌱 CEASA</h1>
+    <p class="text-gray-600 text-lg mb-8">Sistema de compartilhamento de arquivos para empresas</p>
+
+    <!-- Botões -->
+    <div class="space-y-4">
+      <a href="/login" 
+         class="block w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+        Login
+      </a>
+
+      <a href="/cadastro.html" 
+         class="block w-full bg-gray-100 text-green-700 px-6 py-3 rounded-lg font-semibold border hover:bg-gray-200 transition">
+        Cadastre-se
+      </a>
     </div>
-  </header>
+  </div>
 
-  <!-- Main -->
-  <main class="max-w-4xl mx-auto mt-12 p-6 bg-white shadow-lg rounded-2xl">
-    <h2 class="text-2xl font-semibold text-green-700 mb-6">Cadastro de Empresas</h2>
-    
-    <form class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium">Nome da Empresa</label>
-        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium">CNPJ</label>
-        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium">Número do Box</label>
-        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium">E-mail</label>
-        <input type="email" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
-      </div>
-
-      <button type="submit" class="w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700">
-        Cadastrar Empresa
-      </button>
-    </form>
-  </main>
-
-  <!-- Footer -->
-  <footer class="bg-green-700 text-white text-center p-4 mt-12">
-    <p>© 2025 CEASA - Sistema de Empresas</p>
-  </footer>
 </body>
 </html>
