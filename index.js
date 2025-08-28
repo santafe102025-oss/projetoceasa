@@ -10,10 +10,12 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Conexão com banco SQLite
+// ======================
+// BANCO DE DADOS SQLITE
+// ======================
 const db = new Database("database.db");
 
-// Criação das tabelas (se não existirem)
+// Criação das tabelas
 db.prepare(`CREATE TABLE IF NOT EXISTS empresas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,
@@ -32,50 +34,79 @@ db.prepare(`CREATE TABLE IF NOT EXISTS arquivos (
   FOREIGN KEY (empresa_id) REFERENCES empresas (id)
 )`).run();
 
-// Configuração Supabase
+// ======================
+// SUPABASE
+// ======================
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Middlewares
+// ======================
+// MIDDLEWARES
+// ======================
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use(
   session({
-    secret: "segredo",
+    secret: "segredo_ceasa",
     resave: false,
     saveUninitialized: true,
   })
 );
 
-// Middleware de autenticação
+// Autenticação geral
 function authMiddleware(req, res, next) {
-  if (!req.session.userId) {
+  if (!req.session.userId && !req.session.isAdmin) {
     return res.redirect("/login");
   }
   next();
 }
 
+// Somente administradores
+function adminMiddleware(req, res, next) {
+  if (!req.session.isAdmin) {
+    return res.status(403).send("Acesso negado. Apenas administradores.");
+  }
+  next();
+}
+
 // ======================
-// ROTAS
+// ROTAS PÁGINAS
 // ======================
 
-// Página inicial -> redireciona para login
+// Home → direciona
 app.get("/", (req, res) => {
-  res.redirect("/login");
+  if (req.session.isAdmin) return res.redirect("/admin");
+  if (req.session.userId) return res.redirect("/empresa");
+  return res.redirect("/login");
 });
 
-// rota GET para exibir a página de login
+// Login empresas
 app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
-// Página da empresa (somente logado)
+// Login administrador
+app.get("/admin-login", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin-login.html"));
+});
+
+// Página da empresa
 app.get("/empresa", authMiddleware, (req, res) => {
+  if (req.session.isAdmin) return res.redirect("/admin");
   res.sendFile(path.join(__dirname, "public", "empresa.html"));
 });
 
-// Cadastro de empresa
+// Painel do administrador
+app.get("/admin", adminMiddleware, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// ======================
+// CADASTRO E LOGIN
+// ======================
+
+// Cadastro empresa
 app.post("/cadastro", async (req, res) => {
   const { nome, cnpj, box, email, senha } = req.body;
   try {
@@ -91,17 +122,24 @@ app.post("/cadastro", async (req, res) => {
   }
 });
 
-// Login
+// Login (empresas e admin)
 app.post("/login", async (req, res) => {
   const { email, senha } = req.body;
+
+  // Login administrador fixo
+  if (email === "admin@ceasa.com" && senha === "ceasa123") {
+    req.session.isAdmin = true;
+    return res.redirect("/admin");
+  }
+
   try {
     const empresa = db.prepare("SELECT * FROM empresas WHERE email = ?").get(email);
     if (empresa && (await bcrypt.compare(senha, empresa.senha))) {
       req.session.userId = empresa.id;
       req.session.cnpj = empresa.cnpj;
-      res.redirect("/empresa");
+      return res.redirect("/empresa");
     } else {
-      res.status(401).send("Credenciais inválidas.");
+      return res.status(401).send("Credenciais inválidas.");
     }
   } catch (err) {
     console.error("Erro no login:", err.message);
@@ -109,8 +147,12 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// Upload de arquivos (feito pelo administrador)
-app.post("/upload/:empresaId", async (req, res) => {
+// ======================
+// UPLOAD & LISTAGEM
+// ======================
+
+// Upload arquivos (admin)
+app.post("/upload/:empresaId", adminMiddleware, async (req, res) => {
   const empresaId = req.params.empresaId;
   const { nomeArquivo, conteudo } = req.body;
 
@@ -145,21 +187,20 @@ app.post("/upload/:empresaId", async (req, res) => {
   }
 });
 
-// Listagem de arquivos para a empresa logada
+// Listagem arquivos (empresa logada)
 app.get("/arquivos", authMiddleware, async (req, res) => {
   try {
-    const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(req.session.userId);
+    if (req.session.isAdmin) return res.status(403).send("Somente empresas acessam.");
+
+    const empresaId = req.session.userId;
+    const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(empresaId);
 
     const arquivosComUrls = await Promise.all(
       arquivos.map(async (arquivo) => {
-        const { data, error } = await supabase.storage
+        const { data } = await supabase.storage
           .from("arquivos")
           .createSignedUrl(arquivo.caminho, 60 * 60);
-
-        return {
-          ...arquivo,
-          url: data?.signedUrl || null,
-        };
+        return { ...arquivo, url: data?.signedUrl || null };
       })
     );
 
@@ -170,14 +211,18 @@ app.get("/arquivos", authMiddleware, async (req, res) => {
   }
 });
 
-// Logout
+// ======================
+// LOGOUT
+// ======================
 app.get("/logout", (req, res) => {
   req.session.destroy(() => {
     res.redirect("/login");
   });
 });
 
-// Inicializa servidor
+// ======================
+// INICIALIZA SERVIDOR
+// ======================
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
