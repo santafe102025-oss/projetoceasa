@@ -1,161 +1,59 @@
-require("dotenv").config();
-const express = require("express");
-const session = require("express-session");
-const bodyParser = require("body-parser");
-const bcrypt = require('bcryptjs'); // <- substitui bcrypt por bcryptjs
-const { createClient } = require("@supabase/supabase-js");
-const Database = require("better-sqlite3"); // <- substitui sqlite3 por better-sqlite3
-const path = require("path");
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CEASA - Sistema de Empresas</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-green-50 text-gray-800">
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+  <!-- Header -->
+  <header class="bg-green-700 text-white shadow-md">
+    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
+      <h1 class="text-2xl font-bold">🌱 CEASA</h1>
+      <nav class="space-x-4">
+        <a href="/" class="hover:underline">Início</a>
+        <a href="/login" class="hover:underline">Login</a>
+      </nav>
+    </div>
+  </header>
 
-// Conexão com banco SQLite
-const db = new Database("database.db");
+  <!-- Main -->
+  <main class="max-w-4xl mx-auto mt-12 p-6 bg-white shadow-lg rounded-2xl">
+    <h2 class="text-2xl font-semibold text-green-700 mb-6">Cadastro de Empresas</h2>
+    
+    <form class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Nome da Empresa</label>
+        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
 
-// Criação das tabelas (se não existirem)
-db.prepare(`CREATE TABLE IF NOT EXISTS empresas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nome TEXT NOT NULL,
-  cnpj TEXT NOT NULL UNIQUE,
-  box TEXT,
-  email TEXT NOT NULL UNIQUE,
-  senha TEXT NOT NULL
-)`).run();
+      <div>
+        <label class="block text-sm font-medium">CNPJ</label>
+        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
 
-db.prepare(`CREATE TABLE IF NOT EXISTS arquivos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  empresa_id INTEGER NOT NULL,
-  nome TEXT NOT NULL,
-  caminho TEXT NOT NULL,
-  data_upload DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (empresa_id) REFERENCES empresas (id)
-)`).run();
+      <div>
+        <label class="block text-sm font-medium">Número do Box</label>
+        <input type="text" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
 
-// Configuração Supabase
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+      <div>
+        <label class="block text-sm font-medium">E-mail</label>
+        <input type="email" class="w-full mt-1 p-2 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
 
-// Middlewares
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
+      <button type="submit" class="w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700">
+        Cadastrar Empresa
+      </button>
+    </form>
+  </main>
 
-app.use(
-  session({
-    secret: "segredo",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
-
-// Middleware de autenticação
-function authMiddleware(req, res, next) {
-  if (!req.session.userId) {
-    return res.redirect("/login.html");
-  }
-  next();
-}
-
-// Rotas
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
-});
-
-// Cadastro de empresa
-app.post("/cadastro", async (req, res) => {
-  const { nome, cnpj, box, email, senha } = req.body;
-  try {
-    const hash = await bcrypt.hash(senha, 10);
-    db.prepare("INSERT INTO empresas (nome, cnpj, box, email, senha) VALUES (?, ?, ?, ?, ?)")
-      .run(nome, cnpj, box, email, hash);
-    res.redirect("/login.html");
-  } catch (err) {
-    console.error("Erro no cadastro:", err.message);
-    res.status(500).send("Erro ao cadastrar empresa.");
-  }
-});
-
-// Login
-app.post("/login", async (req, res) => {
-  const { email, senha } = req.body;
-  try {
-    const empresa = db.prepare("SELECT * FROM empresas WHERE email = ?").get(email);
-    if (empresa && await bcrypt.compare(senha, empresa.senha)) {
-      req.session.userId = empresa.id;
-      req.session.cnpj = empresa.cnpj;
-      res.redirect("/empresa.html");
-    } else {
-      res.status(401).send("Credenciais inválidas.");
-    }
-  } catch (err) {
-    console.error("Erro no login:", err.message);
-    res.status(500).send("Erro ao fazer login.");
-  }
-});
-
-// Upload de arquivos (feito pelo administrador)
-app.post("/upload/:empresaId", async (req, res) => {
-  const empresaId = req.params.empresaId;
-  const { nomeArquivo, conteudo } = req.body;
-
-  try {
-    const empresa = db.prepare("SELECT * FROM empresas WHERE id = ?").get(empresaId);
-    if (!empresa) {
-      return res.status(404).send("Empresa não encontrada.");
-    }
-
-    const bucket = "arquivos";
-    const caminho = `${empresa.cnpj}/${nomeArquivo}`;
-
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(caminho, Buffer.from(conteudo, "base64"), {
-      contentType: "application/pdf",
-      upsert: true, // <- substitui automaticamente se já existir
-    });
-
-    if (uploadError) {
-      console.error("Erro no upload:", uploadError.message);
-      return res.status(500).send("Erro ao enviar arquivo.");
-    }
-
-    db.prepare("INSERT INTO arquivos (empresa_id, nome, caminho) VALUES (?, ?, ?)")
-      .run(empresaId, nomeArquivo, caminho);
-
-    res.send("Arquivo enviado com sucesso.");
-  } catch (err) {
-    console.error("Erro no upload:", err.message);
-    res.status(500).send("Erro interno.");
-  }
-});
-
-// Listagem de arquivos para a empresa
-app.get("/arquivos", authMiddleware, async (req, res) => {
-  try {
-    const arquivos = db.prepare("SELECT * FROM arquivos WHERE empresa_id = ?").all(req.session.userId);
-
-    const arquivosComUrls = await Promise.all(
-      arquivos.map(async (arquivo) => {
-        const { data, error } = await supabase.storage.from("arquivos").createSignedUrl(arquivo.caminho, 60 * 60);
-        return {
-          ...arquivo,
-          url: data?.signedUrl || null,
-        };
-      })
-    );
-
-    res.json(arquivosComUrls);
-  } catch (err) {
-    console.error("Erro ao listar arquivos:", err.message);
-    res.status(500).send("Erro interno.");
-  }
-});
-
-// Logout
-app.get("/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect("/login.html");
-});
-
-// Inicializa servidor
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+  <!-- Footer -->
+  <footer class="bg-green-700 text-white text-center p-4 mt-12">
+    <p>© 2025 CEASA - Sistema de Empresas</p>
+  </footer>
+</body>
+</html>
