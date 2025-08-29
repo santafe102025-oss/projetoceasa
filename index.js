@@ -141,8 +141,11 @@ app.post("/cadastro", async (req, res, next) => {
 app.post("/login", async (req, res, next) => {
   const { usuario, cnpj, senha } = req.body;
 
-  // Login administrador fixo
-  if (usuario === "admin" && senha === "ceasa123") {
+  // Login administrador fixo do .env
+  if (
+    usuario === process.env.ADMIN_USER &&
+    senha === process.env.ADMIN_PASS
+  ) {
     req.session.isAdmin = true;
     return res.redirect("/admin");
   }
@@ -150,13 +153,22 @@ app.post("/login", async (req, res, next) => {
   try {
     let query = supabase.from("empresas").select("*").limit(1);
 
-    if (usuario) query = query.eq("usuario", usuario);
-    else if (cnpj) query = query.eq("cnpj", cnpj);
-    else return res.status(400).send("Informe usuário ou CNPJ.");
+    if (usuario) {
+      query = query.eq("usuario", usuario);
+    } else if (cnpj) {
+      query = query.eq("cnpj", cnpj);
+    } else {
+      return res.status(400).send("Informe usuário ou CNPJ.");
+    }
 
     const { data: empresas, error } = await query;
 
-    if (error || !empresas || empresas.length === 0) {
+    if (error) {
+      console.error("❌ Erro Supabase login:", error.message);
+      return res.status(500).send("Erro ao consultar banco.");
+    }
+
+    if (!empresas || empresas.length === 0) {
       return res.status(401).send("Credenciais inválidas.");
     }
 
@@ -171,9 +183,11 @@ app.post("/login", async (req, res, next) => {
       return res.status(401).send("Credenciais inválidas.");
     }
   } catch (err) {
+    console.error("🔥 Erro login:", err.message);
     next(err);
   }
 });
+
 
 // ======================
 // LISTAR EMPRESAS (para admin)
