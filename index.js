@@ -10,9 +10,30 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ======================
+// LOGS DAS VARIÁVEIS
+// ======================
+console.log("🔑 SUPABASE_URL:", process.env.SUPABASE_URL || "NÃO DEFINIDA");
+console.log("🔑 SUPABASE_KEY:", process.env.SUPABASE_KEY ? "Definida" : "NÃO DEFINIDA");
+console.log("🔑 SESSION_SECRET:", process.env.SESSION_SECRET ? "Definida" : "NÃO DEFINIDA");
+
+// ======================
 // SUPABASE
 // ======================
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Testa conexão inicial
+(async () => {
+  try {
+    const { error } = await supabase.from("empresas").select("*").limit(1);
+    if (error) {
+      console.error("❌ Erro ao conectar Supabase:", error.message);
+    } else {
+      console.log("✅ Conexão Supabase funcionando!");
+    }
+  } catch (err) {
+    console.error("❌ Erro Supabase (catch):", err.message);
+  }
+})();
 
 // ======================
 // MIDDLEWARES
@@ -23,9 +44,10 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use(
   session({
-    secret: "segredo_ceasa",
+    secret: process.env.SESSION_SECRET || "segredo_default",
     resave: false,
     saveUninitialized: true,
+    cookie: { secure: false }, // em produção com HTTPS -> true
   })
 );
 
@@ -78,7 +100,7 @@ app.get("/cadastro", (req, res) => {
 // ======================
 // CADASTRO DE EMPRESA
 // ======================
-app.post("/cadastro", async (req, res) => {
+app.post("/cadastro", async (req, res, next) => {
   const { nome, cnpj, box, usuario, senha } = req.body;
   try {
     const hash = await bcrypt.hash(senha, 10);
@@ -109,15 +131,14 @@ app.post("/cadastro", async (req, res) => {
 
     res.redirect("/login");
   } catch (err) {
-    console.error("Erro no cadastro:", err.message);
-    res.status(500).send("Erro ao cadastrar empresa.");
+    next(err);
   }
 });
 
 // ======================
 // LOGIN
 // ======================
-app.post("/login", async (req, res) => {
+app.post("/login", async (req, res, next) => {
   const { usuario, cnpj, senha } = req.body;
 
   // Login administrador fixo
@@ -129,13 +150,9 @@ app.post("/login", async (req, res) => {
   try {
     let query = supabase.from("empresas").select("*").limit(1);
 
-    if (usuario) {
-      query = query.eq("usuario", usuario);
-    } else if (cnpj) {
-      query = query.eq("cnpj", cnpj);
-    } else {
-      return res.status(400).send("Informe usuário ou CNPJ.");
-    }
+    if (usuario) query = query.eq("usuario", usuario);
+    else if (cnpj) query = query.eq("cnpj", cnpj);
+    else return res.status(400).send("Informe usuário ou CNPJ.");
 
     const { data: empresas, error } = await query;
 
@@ -154,15 +171,14 @@ app.post("/login", async (req, res) => {
       return res.status(401).send("Credenciais inválidas.");
     }
   } catch (err) {
-    console.error("Erro no login:", err.message);
-    res.status(500).send("Erro ao fazer login.");
+    next(err);
   }
 });
 
 // ======================
 // LISTAR EMPRESAS (para admin)
 // ======================
-app.get("/empresas", adminMiddleware, async (req, res) => {
+app.get("/empresas", adminMiddleware, async (req, res, next) => {
   try {
     const { data: empresas, error } = await supabase
       .from("empresas")
@@ -172,19 +188,17 @@ app.get("/empresas", adminMiddleware, async (req, res) => {
 
     res.json(empresas);
   } catch (err) {
-    console.error("Erro ao listar empresas:", err.message);
-    res.status(500).send("Erro ao buscar empresas.");
+    next(err);
   }
 });
 
 // ======================
 // EXCLUIR EMPRESA (para admin)
 // ======================
-app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
+app.delete("/empresas/:id", adminMiddleware, async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    // Buscar empresa para pegar CNPJ
     const { data: empresa, error: selectError } = await supabase
       .from("empresas")
       .select("id, cnpj")
@@ -195,7 +209,6 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
       return res.status(404).send("Empresa não encontrada.");
     }
 
-    // Excluir empresa do banco
     const { error: deleteError } = await supabase
       .from("empresas")
       .delete()
@@ -203,7 +216,6 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // Excluir pasta da empresa no Storage
     const bucket = "arquivos";
     const prefix = `${empresa.cnpj}/`;
 
@@ -211,22 +223,21 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
       .from(bucket)
       .list(prefix, { limit: 1000 });
 
-    if (!listError && arquivos.length > 0) {
+    if (!listError && arquivos && arquivos.length > 0) {
       const paths = arquivos.map((arq) => `${prefix}${arq.name}`);
       await supabase.storage.from(bucket).remove(paths);
     }
 
     res.json({ message: "Empresa e arquivos excluídos com sucesso!" });
   } catch (err) {
-    console.error("Erro ao excluir empresa:", err.message);
-    res.status(500).send("Erro ao excluir empresa.");
+    next(err);
   }
 });
 
 // ======================
 // LISTAR ARQUIVOS DA EMPRESA (para empresa logada)
 // ======================
-app.get("/meus-arquivos", authMiddleware, async (req, res) => {
+app.get("/meus-arquivos", authMiddleware, async (req, res, next) => {
   if (!req.session.cnpj) return res.status(403).send("Não autorizado");
 
   try {
@@ -239,63 +250,55 @@ app.get("/meus-arquivos", authMiddleware, async (req, res) => {
 
     if (error) throw error;
 
-    // gera URLs temporárias
     const arquivosComLinks = await Promise.all(
       arquivos
         .filter((a) => a.name !== ".keep")
         .map(async (arq) => {
           const { data: urlData } = await supabase.storage
             .from(bucket)
-            .createSignedUrl(`${prefix}${arq.name}`, 60 * 60); // 1h
-          return { nome: arq.name, url: urlData.signedUrl };
+            .createSignedUrl(`${prefix}${arq.name}`, 60 * 60);
+          return { nome: arq.name, url: urlData?.signedUrl || "#" };
         })
     );
 
     res.json(arquivosComLinks);
   } catch (err) {
-    console.error("Erro ao listar arquivos:", err.message);
-    res.status(500).send("Erro ao buscar arquivos.");
+    next(err);
   }
 });
 
 // ======================
 // LISTAR ARQUIVOS DA EMPRESA
 // ======================
-app.get("/arquivos", authMiddleware, async (req, res) => {
+app.get("/arquivos", authMiddleware, async (req, res, next) => {
   try {
     const bucket = "arquivos";
     const cnpj = req.session.cnpj;
 
-    // Lista arquivos dentro da pasta do CNPJ
     const { data: arquivos, error } = await supabase.storage
       .from(bucket)
       .list(`${cnpj}/`, { limit: 1000 });
 
     if (error) throw error;
 
-    // Montar resposta com nome, data e URL pública temporária
     const lista = await Promise.all(
       arquivos.map(async (arq) => {
-        // Ignora o ".keep"
         if (arq.name === ".keep") return null;
 
-        // Gera URL de download (válida por 1 hora)
         const { data: urlData } = await supabase.storage
           .from(bucket)
           .createSignedUrl(`${cnpj}/${arq.name}`, 3600);
 
         return {
           nome: arq.name,
-          data_upload: arq.created_at,
           url: urlData?.signedUrl || "#",
         };
       })
     );
 
-    res.json(lista.filter(Boolean)); // remove nulls
+    res.json(lista.filter(Boolean));
   } catch (err) {
-    console.error("Erro ao listar arquivos:", err.message);
-    res.status(500).send("Erro ao listar arquivos.");
+    next(err);
   }
 });
 
@@ -309,8 +312,16 @@ app.get("/logout", (req, res) => {
 });
 
 // ======================
+// MIDDLEWARE DE ERRO GLOBAL
+// ======================
+app.use((err, req, res, next) => {
+  console.error("🔥 Erro no servidor:", err.stack);
+  res.status(500).send("Erro interno no servidor: " + err.message);
+});
+
+// ======================
 // INICIALIZA SERVIDOR
 // ======================
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
