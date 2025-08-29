@@ -35,9 +35,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
   }
 })();
 
-import bcrypt from "bcrypt";
-import { supabase } from "./supabaseClient.js"; // ajuste o caminho se precisar
-
+// ======================
+// CRIAR ADMIN AUTOMATICAMENTE
+// ======================
 async function criarAdmin() {
   try {
     const usuario = "admin";
@@ -49,15 +49,18 @@ async function criarAdmin() {
     // Faz o upsert (insere se não existir, atualiza se já existir)
     const { error } = await supabase
       .from("empresas")
-      .upsert([
-        {
-          cnpj: "00000000000000",
-          nome: "Administrador",
-          box: "0",
-          usuario,
-          senha: hash,
-        },
-      ], { onConflict: "usuario" }); // garante que não duplica pelo campo usuario
+      .upsert(
+        [
+          {
+            cnpj: "00000000000000",
+            nome: "Administrador",
+            box: "0",
+            usuario,
+            senha: hash,
+          },
+        ],
+        { onConflict: "usuario" }
+      ); // garante que não duplica pelo campo usuario
 
     if (error) {
       console.error("❌ Erro ao criar admin:", error.message);
@@ -71,7 +74,6 @@ async function criarAdmin() {
 
 // chama essa função logo depois de conectar no supabase
 criarAdmin();
-
 
 // ======================
 // MIDDLEWARES
@@ -201,6 +203,10 @@ app.post("/login", async (req, res, next) => {
     if (senhaOk) {
       req.session.userId = empresa.id;
       req.session.cnpj = empresa.cnpj;
+      if (empresa.usuario === "admin") {
+        req.session.isAdmin = true;
+        return res.redirect("/admin");
+      }
       return res.redirect("/empresa");
     } else {
       return res.status(401).send("Credenciais inválidas.");
@@ -210,8 +216,6 @@ app.post("/login", async (req, res, next) => {
     next(err);
   }
 });
-
-
 
 // ======================
 // LISTAR EMPRESAS (para admin)
@@ -267,39 +271,6 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res, next) => {
     }
 
     res.json({ message: "Empresa e arquivos excluídos com sucesso!" });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ======================
-// LISTAR ARQUIVOS DA EMPRESA (para empresa logada)
-// ======================
-app.get("/meus-arquivos", authMiddleware, async (req, res, next) => {
-  if (!req.session.cnpj) return res.status(403).send("Não autorizado");
-
-  try {
-    const bucket = "arquivos";
-    const prefix = `${req.session.cnpj}/`;
-
-    const { data: arquivos, error } = await supabase.storage
-      .from(bucket)
-      .list(prefix, { limit: 100 });
-
-    if (error) throw error;
-
-    const arquivosComLinks = await Promise.all(
-      arquivos
-        .filter((a) => a.name !== ".keep")
-        .map(async (arq) => {
-          const { data: urlData } = await supabase.storage
-            .from(bucket)
-            .createSignedUrl(`${prefix}${arq.name}`, 60 * 60);
-          return { nome: arq.name, url: urlData?.signedUrl || "#" };
-        })
-    );
-
-    res.json(arquivosComLinks);
   } catch (err) {
     next(err);
   }
