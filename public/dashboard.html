@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - CEASA</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SDK do Supabase -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-green-50 min-h-screen flex flex-col">
 
@@ -29,9 +31,12 @@
         <h3 class="font-semibold text-green-700 mb-2">Empresas Cadastradas</h3>
         <p class="text-sm text-gray-600">Visualizar e filtrar por CNPJ, nome ou box.</p>
       </div>
+
+      <!-- Arquivos -->
       <div class="p-4 border rounded-lg shadow-sm hover:shadow-md">
         <h3 class="font-semibold text-green-700 mb-2">Arquivos</h3>
-        <p class="text-sm text-gray-600">Baixar os documentos enviados pelo administrador.</p>
+        <p class="text-sm text-gray-600 mb-4">Baixar os documentos enviados pelo administrador.</p>
+        <ul id="listaArquivos" class="space-y-2 text-sm text-gray-700"></ul>
       </div>
     </div>
   </main>
@@ -40,5 +45,66 @@
   <footer class="bg-green-700 text-white text-center p-4 mt-12">
     <p>© 2025 CEASA - Sistema de Empresas</p>
   </footer>
+
+  <script>
+    // 🔑 Configuração do Supabase
+    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+    const SUPABASE_KEY = "SEU_PUBLIC_ANON_KEY";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ⚡ Aqui você deve recuperar o CNPJ ou ID do usuário logado
+    // Pode ser salvo no localStorage durante o login
+    const cnpjOuId = localStorage.getItem("empresaCnpj") || "TESTE123"; 
+
+    // Função para listar arquivos
+    async function listarArquivos() {
+      const listaEl = document.getElementById("listaArquivos");
+      listaEl.innerHTML = "<li class='text-gray-500'>Carregando...</li>";
+
+      const { data, error } = await supabase
+        .storage
+        .from("arquivos")
+        .list(`${cnpjOuId}/`, {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" }
+        });
+
+      if (error) {
+        listaEl.innerHTML = `<li class="text-red-600">❌ Erro ao carregar arquivos: ${error.message}</li>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaEl.innerHTML = "<li class='text-gray-500'>Nenhum arquivo disponível</li>";
+        return;
+      }
+
+      const arquivosComLinks = await Promise.all(
+        data.map(async (file) => {
+          const { data: signedUrlData } = await supabase
+            .storage
+            .from("arquivos")
+            .createSignedUrl(`${cnpjOuId}/${file.name}`, 300); // 5 min de validade
+
+          return {
+            name: file.name,
+            url: signedUrlData?.signedUrl
+          };
+        })
+      );
+
+      listaEl.innerHTML = arquivosComLinks.map(a => `
+        <li>
+          <a href="${a.url}" target="_blank" class="text-blue-600 hover:underline">
+            📄 ${a.name}
+          </a>
+        </li>
+      `).join("");
+    }
+
+    // Carregar ao abrir o dashboard
+    listarArquivos();
+  </script>
 </body>
 </html>

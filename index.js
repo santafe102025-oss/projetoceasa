@@ -207,7 +207,6 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
     const bucket = "arquivos";
     const prefix = `${empresa.cnpj}/`;
 
-    // Lista os arquivos
     const { data: arquivos, error: listError } = await supabase.storage
       .from(bucket)
       .list(prefix, { limit: 1000 });
@@ -221,6 +220,82 @@ app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Erro ao excluir empresa:", err.message);
     res.status(500).send("Erro ao excluir empresa.");
+  }
+});
+
+// ======================
+// LISTAR ARQUIVOS DA EMPRESA (para empresa logada)
+// ======================
+app.get("/meus-arquivos", authMiddleware, async (req, res) => {
+  if (!req.session.cnpj) return res.status(403).send("Não autorizado");
+
+  try {
+    const bucket = "arquivos";
+    const prefix = `${req.session.cnpj}/`;
+
+    const { data: arquivos, error } = await supabase.storage
+      .from(bucket)
+      .list(prefix, { limit: 100 });
+
+    if (error) throw error;
+
+    // gera URLs temporárias
+    const arquivosComLinks = await Promise.all(
+      arquivos
+        .filter((a) => a.name !== ".keep")
+        .map(async (arq) => {
+          const { data: urlData } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(`${prefix}${arq.name}`, 60 * 60); // 1h
+          return { nome: arq.name, url: urlData.signedUrl };
+        })
+    );
+
+    res.json(arquivosComLinks);
+  } catch (err) {
+    console.error("Erro ao listar arquivos:", err.message);
+    res.status(500).send("Erro ao buscar arquivos.");
+  }
+});
+
+// ======================
+// LISTAR ARQUIVOS DA EMPRESA
+// ======================
+app.get("/arquivos", authMiddleware, async (req, res) => {
+  try {
+    const bucket = "arquivos";
+    const cnpj = req.session.cnpj;
+
+    // Lista arquivos dentro da pasta do CNPJ
+    const { data: arquivos, error } = await supabase.storage
+      .from(bucket)
+      .list(`${cnpj}/`, { limit: 1000 });
+
+    if (error) throw error;
+
+    // Montar resposta com nome, data e URL pública temporária
+    const lista = await Promise.all(
+      arquivos.map(async (arq) => {
+        // Ignora o ".keep"
+        if (arq.name === ".keep") return null;
+
+        // Gera URL de download (válida por 1 hora)
+        const { data: urlData } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(`${cnpj}/${arq.name}`, 3600);
+
+        return {
+          nome: arq.name,
+          data_upload: arq.created_at,
+          url: urlData?.signedUrl || "#",
+        };
+      })
+    );
+
+    res.json(lista.filter(Boolean)); // remove nulls
+  } catch (err) {
+    console.error("Erro ao listar arquivos:", err.message);
+    res.status(500).send("Erro ao listar arquivos.");
   }
 });
 
