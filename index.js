@@ -140,40 +140,25 @@ app.post("/cadastro", async (req, res, next) => {
 // ======================
 app.post("/login", async (req, res, next) => {
   const { usuario, cnpj, senha } = req.body;
-
-  // Login administrador fixo do .env
-  if (
-    usuario === process.env.ADMIN_USER &&
-    senha === process.env.ADMIN_PASS
-  ) {
-    req.session.isAdmin = true;
-    return res.redirect("/admin");
-  }
+  console.log("🟢 LOGIN REQ BODY:", req.body);
 
   try {
     let query = supabase.from("empresas").select("*").limit(1);
 
-    if (usuario) {
-      query = query.eq("usuario", usuario);
-    } else if (cnpj) {
-      query = query.eq("cnpj", cnpj);
-    } else {
-      return res.status(400).send("Informe usuário ou CNPJ.");
-    }
+    if (usuario) query = query.eq("usuario", usuario);
+    else if (cnpj) query = query.eq("cnpj", cnpj);
+    else return res.status(400).send("Informe usuário ou CNPJ.");
 
     const { data: empresas, error } = await query;
+    console.log("📦 Resultado Supabase:", { empresas, error });
 
-    if (error) {
-      console.error("❌ Erro Supabase login:", error.message);
-      return res.status(500).send("Erro ao consultar banco.");
-    }
-
-    if (!empresas || empresas.length === 0) {
+    if (error || !empresas || empresas.length === 0) {
       return res.status(401).send("Credenciais inválidas.");
     }
 
     const empresa = empresas[0];
     const senhaOk = await bcrypt.compare(senha, empresa.senha);
+    console.log("🔑 Senha válida?", senhaOk);
 
     if (senhaOk) {
       req.session.userId = empresa.id;
@@ -187,6 +172,7 @@ app.post("/login", async (req, res, next) => {
     next(err);
   }
 });
+
 
 
 // ======================
