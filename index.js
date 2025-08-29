@@ -9,12 +9,6 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ======================
-// LOGS DAS VARIÁVEIS
-// ======================
-console.log("🔑 SUPABASE_URL:", process.env.SUPABASE_URL || "NÃO DEFINIDA");
-console.log("🔑 SUPABASE_KEY:", process.env.SUPABASE_KEY ? "Definida" : "NÃO DEFINIDA");
-console.log("🔑 SESSION_SECRET:", process.env.SESSION_SECRET ? "Definida" : "NÃO DEFINIDA");
 
 // ======================
 // SUPABASE

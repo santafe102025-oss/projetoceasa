@@ -3,107 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - CEASA</title>
+  <title>Painel da Empresa - CEASA</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SDK do Supabase -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-green-50 min-h-screen flex flex-col">
 
   <!-- Header -->
-  <header class="bg-green-700 text-white shadow-md">
-    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
-      <h1 class="text-2xl font-bold">🌱 CEASA - Dashboard</h1>
-      <a href="/login.html" class="bg-white text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-100">Sair</a>
-    </div>
+  <header class="bg-green-700 text-white p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">🌱 CEASA - Painel da Empresa</h1>
+    <button onclick="logout()" class="bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600 transition">
+      Sair
+    </button>
   </header>
 
-  <!-- Main -->
-  <main class="flex-grow max-w-6xl mx-auto mt-8 p-6 bg-white shadow-lg rounded-2xl">
-    <h2 class="text-xl font-semibold text-green-700 mb-6">Bem-vindo ao Sistema CEASA</h2>
+  <!-- Conteúdo -->
+  <main class="flex-1 container mx-auto p-6">
+    <h2 class="text-2xl font-semibold mb-4">📂 Seus Arquivos</h2>
 
-    <p class="mb-4 text-gray-700">
-      Aqui você pode gerenciar empresas e acessar arquivos disponibilizados pelo administrador.
-    </p>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="p-4 border rounded-lg shadow-sm hover:shadow-md">
-        <h3 class="font-semibold text-green-700 mb-2">Empresas Cadastradas</h3>
-        <p class="text-sm text-gray-600">Visualizar e filtrar por CNPJ, nome ou box.</p>
-      </div>
-
-      <!-- Arquivos -->
-      <div class="p-4 border rounded-lg shadow-sm hover:shadow-md">
-        <h3 class="font-semibold text-green-700 mb-2">Arquivos</h3>
-        <p class="text-sm text-gray-600 mb-4">Baixar os documentos enviados pelo administrador.</p>
-        <ul id="listaArquivos" class="space-y-2 text-sm text-gray-700"></ul>
-      </div>
-    </div>
+    <ul id="listaArquivos" class="space-y-2">
+      <li class="text-gray-500">Carregando...</li>
+    </ul>
   </main>
 
-  <!-- Footer -->
-  <footer class="bg-green-700 text-white text-center p-4 mt-12">
-    <p>© 2025 CEASA - Sistema de Empresas</p>
-  </footer>
-
   <script>
-    // 🔑 Configuração do Supabase
-    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
-    const SUPABASE_KEY = "SEU_PUBLIC_ANON_KEY";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // ⚡ Aqui você deve recuperar o CNPJ ou ID do usuário logado
-    // Pode ser salvo no localStorage durante o login
-    const cnpjOuId = localStorage.getItem("empresaCnpj") || "TESTE123"; 
-
-    // Função para listar arquivos
     async function listarArquivos() {
       const listaEl = document.getElementById("listaArquivos");
       listaEl.innerHTML = "<li class='text-gray-500'>Carregando...</li>";
 
-      const { data, error } = await supabase
-        .storage
-        .from("arquivos")
-        .list(`${cnpjOuId}/`, {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: "created_at", order: "desc" }
-        });
+      try {
+        const resposta = await fetch("/arquivos");
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar arquivos");
+        }
 
-      if (error) {
-        listaEl.innerHTML = `<li class="text-red-600">❌ Erro ao carregar arquivos: ${error.message}</li>`;
-        return;
+        const arquivos = await resposta.json();
+
+        if (!arquivos || arquivos.length === 0) {
+          listaEl.innerHTML = "<li class='text-gray-500'>Nenhum arquivo disponível</li>";
+          return;
+        }
+
+        listaEl.innerHTML = arquivos.map(a => `
+          <li class="p-3 bg-white shadow rounded-lg">
+            <a href="${a.url}" target="_blank" class="text-blue-600 hover:underline">
+              📄 ${a.nome}
+            </a>
+          </li>
+        `).join("");
+      } catch (err) {
+        listaEl.innerHTML = `<li class="text-red-600">❌ ${err.message}</li>`;
       }
-
-      if (!data || data.length === 0) {
-        listaEl.innerHTML = "<li class='text-gray-500'>Nenhum arquivo disponível</li>";
-        return;
-      }
-
-      const arquivosComLinks = await Promise.all(
-        data.map(async (file) => {
-          const { data: signedUrlData } = await supabase
-            .storage
-            .from("arquivos")
-            .createSignedUrl(`${cnpjOuId}/${file.name}`, 300); // 5 min de validade
-
-          return {
-            name: file.name,
-            url: signedUrlData?.signedUrl
-          };
-        })
-      );
-
-      listaEl.innerHTML = arquivosComLinks.map(a => `
-        <li>
-          <a href="${a.url}" target="_blank" class="text-blue-600 hover:underline">
-            📄 ${a.name}
-          </a>
-        </li>
-      `).join("");
     }
 
-    // Carregar ao abrir o dashboard
+    function logout() {
+      fetch("/logout", { method: "POST" })
+        .then(() => {
+          localStorage.clear();
+          window.location.href = "/login.html";
+        });
+    }
+
+    // Carrega arquivos ao abrir a página
     listarArquivos();
   </script>
 </body>
