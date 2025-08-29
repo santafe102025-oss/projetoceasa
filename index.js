@@ -35,6 +35,44 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
   }
 })();
 
+import bcrypt from "bcrypt";
+import { supabase } from "./supabaseClient.js"; // ajuste o caminho se precisar
+
+async function criarAdmin() {
+  try {
+    const usuario = "admin";
+    const senhaPura = "ceasa123";
+
+    // Gera o hash da senha
+    const hash = await bcrypt.hash(senhaPura, 10);
+
+    // Faz o upsert (insere se não existir, atualiza se já existir)
+    const { error } = await supabase
+      .from("empresas")
+      .upsert([
+        {
+          cnpj: "00000000000000",
+          nome: "Administrador",
+          box: "0",
+          usuario,
+          senha: hash,
+        },
+      ], { onConflict: "usuario" }); // garante que não duplica pelo campo usuario
+
+    if (error) {
+      console.error("❌ Erro ao criar admin:", error.message);
+    } else {
+      console.log("✅ Usuário admin pronto!");
+    }
+  } catch (err) {
+    console.error("❌ Erro inesperado:", err.message);
+  }
+}
+
+// chama essa função logo depois de conectar no supabase
+criarAdmin();
+
+
 // ======================
 // MIDDLEWARES
 // ======================
