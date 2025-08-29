@@ -63,19 +63,16 @@
           body: JSON.stringify({ usuario, senha })
         });
 
-        const data = await resposta.json();
-
-        if (!resposta.ok) {
-          erroMsg.textContent = data.error || "❌ Usuário ou senha inválidos";
-          erroMsg.classList.remove("hidden");
+        // Se o servidor fez redirect, seguimos para o destino
+        if (resposta.redirected) {
+          window.location.href = resposta.url;
           return;
         }
 
-        // ✅ Salva o CNPJ/ID no localStorage
-        localStorage.setItem("empresaCnpj", data.cnpj || data.id);
-
-        // Redireciona para o dashboard
-        window.location.href = "/dashboard.html";
+        // Caso contrário, tenta pegar mensagem de erro
+        const data = await resposta.text();
+        erroMsg.textContent = data || "❌ Usuário ou senha inválidos";
+        erroMsg.classList.remove("hidden");
       } catch (err) {
         erroMsg.textContent = "❌ Erro ao conectar com o servidor";
         erroMsg.classList.remove("hidden");

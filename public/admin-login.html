@@ -16,17 +16,17 @@
     </div>
 
     <!-- Formulário de Login Admin -->
-    <form action="/login" method="POST" class="space-y-4">
+    <form id="adminLoginForm" class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700">Usuário</label>
-        <input type="text" name="usuario" required
+        <input type="text" id="usuario" name="usuario" required
           placeholder="Digite seu usuário"
           class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
       </div>
 
       <div>
         <label class="block text-sm font-medium text-gray-700">Senha</label>
-        <input type="password" name="senha" required
+        <input type="password" id="senha" name="senha" required
           placeholder="Digite sua senha"
           class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
       </div>
@@ -37,6 +37,9 @@
       </button>
     </form>
 
+    <!-- Mensagem de erro -->
+    <p id="erroMsg" class="text-center text-red-600 text-sm mt-4 hidden"></p>
+
     <!-- Voltar ao login comum -->
     <p class="text-center text-sm text-gray-600 mt-6">
       Não é administrador? 
@@ -44,5 +47,38 @@
     </p>
   </div>
 
+  <script>
+    const form = document.getElementById("adminLoginForm");
+    const erroMsg = document.getElementById("erroMsg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const usuario = document.getElementById("usuario").value.trim();
+      const senha = document.getElementById("senha").value.trim();
+
+      try {
+        const resposta = await fetch("/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario, senha })
+        });
+
+        // Se o servidor responder com redirect, segue o destino
+        if (resposta.redirected) {
+          window.location.href = resposta.url;
+          return;
+        }
+
+        // Caso contrário, mostra mensagem de erro
+        const data = await resposta.text();
+        erroMsg.textContent = data || "❌ Usuário ou senha inválidos";
+        erroMsg.classList.remove("hidden");
+      } catch (err) {
+        erroMsg.textContent = "❌ Erro ao conectar com o servidor";
+        erroMsg.classList.remove("hidden");
+      }
+    });
+  </script>
 </body>
 </html>

@@ -46,7 +46,6 @@ async function criarAdmin() {
     // Gera o hash da senha
     const hash = await bcrypt.hash(senhaPura, 10);
 
-    // Faz o upsert (insere se não existir, atualiza se já existir)
     const { error } = await supabase
       .from("empresas")
       .upsert(
@@ -60,7 +59,7 @@ async function criarAdmin() {
           },
         ],
         { onConflict: "usuario" }
-      ); // garante que não duplica pelo campo usuario
+      );
 
     if (error) {
       console.error("❌ Erro ao criar admin:", error.message);
@@ -72,7 +71,6 @@ async function criarAdmin() {
   }
 }
 
-// chama essa função logo depois de conectar no supabase
 criarAdmin();
 
 // ======================
@@ -118,10 +116,6 @@ app.get("/", (req, res) => {
 
 app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "login.html"));
-});
-
-app.get("/admin-login", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin-login.html"));
 });
 
 app.get("/empresa", authMiddleware, (req, res) => {
@@ -203,10 +197,14 @@ app.post("/login", async (req, res, next) => {
     if (senhaOk) {
       req.session.userId = empresa.id;
       req.session.cnpj = empresa.cnpj;
+
+      // 🚀 Marca admin na sessão
       if (empresa.usuario === "admin") {
         req.session.isAdmin = true;
         return res.redirect("/admin");
       }
+
+      req.session.isAdmin = false;
       return res.redirect("/empresa");
     } else {
       return res.status(401).send("Credenciais inválidas.");
