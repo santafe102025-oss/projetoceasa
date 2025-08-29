@@ -1,0 +1,9 @@
+administrador
+
+login: admin
+senha: ceasa123
+
+Empresa SANTA FE
+
+login: santafecontabilidade
+senha: santafe10

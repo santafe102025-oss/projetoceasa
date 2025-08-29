@@ -126,6 +126,40 @@ app.get("/cadastro", (req, res) => {
 });
 
 // ======================
+// UPLOAD DE ARQUIVOS DA EMPRESA
+// ======================
+const multer = require("multer");
+const upload = multer(); // Armazena arquivos em memória
+
+app.post("/upload", authMiddleware, upload.single("arquivo"), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).send("Nenhum arquivo enviado.");
+    }
+
+    const bucket = "arquivos";
+    const cnpj = req.session.cnpj;
+    const nomeArquivo = req.file.originalname;
+
+    // Faz upload para o Supabase
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(`${cnpj}/${nomeArquivo}`, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true, // sobrescreve se já existir
+      });
+
+    if (error) throw error;
+
+    res.send("✅ Arquivo enviado com sucesso!");
+  } catch (err) {
+    console.error("🔥 Erro upload:", err.message);
+    next(err);
+  }
+});
+
+
+// ======================
 // CADASTRO DE EMPRESA
 // ======================
 app.post("/cadastro", async (req, res, next) => {

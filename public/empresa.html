@@ -2,154 +2,112 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel da Empresa - CEASA</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Painel da Empresa</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    input[type="file"] {
+      margin: 10px 0;
+    }
+    button {
+      background: #28a745;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #218838;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin: 8px 0;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .logout {
+      display: inline-block;
+      margin-top: 20px;
+      background: #dc3545;
+      padding: 8px 15px;
+      border-radius: 5px;
+      color: white;
+      text-decoration: none;
+    }
+    .logout:hover {
+      background: #c82333;
+    }
+  </style>
 </head>
-<body class="bg-green-50 min-h-screen flex flex-col">
+<body>
+  <div class="container">
+    <h1>📂 Painel da Empresa</h1>
 
-  <!-- Header -->
-  <header class="bg-green-700 text-white shadow-md">
-    <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
-      <h1 class="text-2xl font-bold">🌱 CEASA</h1>
-      <nav class="space-x-4">
-        <a href="/logout" class="hover:underline">Sair</a>
-      </nav>
-    </div>
-  </header>
+    <h2>Upload de Arquivos</h2>
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+      <input type="file" name="arquivo" accept="application/pdf" required>
+      <button type="submit">Enviar PDF</button>
+    </form>
 
-  <!-- Conteúdo principal -->
-  <main class="flex-1 max-w-5xl mx-auto mt-8 p-6 bg-white shadow-lg rounded-2xl">
-    <h2 class="text-2xl font-semibold text-green-700 mb-6">📂 Arquivos da sua empresa</h2>
+    <h2>Arquivos disponíveis</h2>
+    <ul id="lista-arquivos">
+      <li>Carregando arquivos...</li>
+    </ul>
 
-    <!-- Filtros -->
-    <div class="flex flex-wrap gap-4 mb-6">
-      <div>
-        <label for="mes" class="block text-gray-700 mb-1">Mês</label>
-        <select id="mes" class="border rounded-lg px-3 py-2">
-          <option value="">Todos</option>
-          <option value="01">Janeiro</option>
-          <option value="02">Fevereiro</option>
-          <option value="03">Março</option>
-          <option value="04">Abril</option>
-          <option value="05">Maio</option>
-          <option value="06">Junho</option>
-          <option value="07">Julho</option>
-          <option value="08">Agosto</option>
-          <option value="09">Setembro</option>
-          <option value="10">Outubro</option>
-          <option value="11">Novembro</option>
-          <option value="12">Dezembro</option>
-        </select>
-      </div>
-      <div>
-        <label for="ano" class="block text-gray-700 mb-1">Ano</label>
-        <select id="ano" class="border rounded-lg px-3 py-2">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="flex items-end">
-        <button onclick="aplicarFiltro()" 
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-          Filtrar
-        </button>
-      </div>
-    </div>
+    <a class="logout" href="/logout">Sair</a>
+  </div>
 
-    <!-- Tabela -->
-    <div class="overflow-x-auto">
-      <table class="w-full border text-sm">
-        <thead class="bg-gray-200">
-          <tr>
-            <th class="border px-3 py-2 text-left">Nome</th>
-            <th class="border px-3 py-2 text-left">Data de Upload</th>
-            <th class="border px-3 py-2 text-center">Download</th>
-          </tr>
-        </thead>
-        <tbody id="tabelaArquivos">
-          <tr><td colspan="3" class="text-center py-3">Carregando arquivos...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </main>
-
-  <!-- Footer -->
-  <footer class="bg-green-700 text-white text-center p-4 mt-12">
-    <p>© 2025 CEASA - Sistema de Empresas</p>
-  </footer>
-
-  <!-- Script -->
   <script>
-    let arquivos = [];
-
     async function carregarArquivos() {
       try {
         const res = await fetch("/arquivos");
-        if (!res.ok) throw new Error("Erro ao carregar arquivos");
+        const arquivos = await res.json();
+        const lista = document.getElementById("lista-arquivos");
+        lista.innerHTML = "";
 
-        arquivos = await res.json();
+        if (arquivos.length === 0) {
+          lista.innerHTML = "<li>Nenhum arquivo disponível</li>";
+          return;
+        }
 
-        // Preencher anos disponíveis no filtro
-        const anos = [...new Set(arquivos.map(a => new Date(a.data_upload).getFullYear()))];
-        const selectAno = document.getElementById("ano");
-        anos.sort().forEach(ano => {
-          const opt = document.createElement("option");
-          opt.value = ano;
-          opt.textContent = ano;
-          selectAno.appendChild(opt);
+        arquivos.forEach((arq) => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${arq.url}" target="_blank">${arq.nome}</a>`;
+          lista.appendChild(li);
         });
-
-        renderTabela(arquivos);
       } catch (err) {
-        document.getElementById("tabelaArquivos").innerHTML =
-          `<tr><td colspan="3" class="text-center text-red-500 py-3">Erro ao carregar arquivos.</td></tr>`;
+        console.error("Erro ao carregar arquivos:", err);
       }
-    }
-
-    function renderTabela(lista) {
-      const tabela = document.getElementById("tabelaArquivos");
-      tabela.innerHTML = "";
-      if (lista.length === 0) {
-        tabela.innerHTML = `<tr><td colspan="3" class="text-center py-3">Nenhum arquivo encontrado</td></tr>`;
-        return;
-      }
-
-      lista.forEach(a => {
-        const data = new Date(a.data_upload);
-        const dataFormatada = data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-
-        tabela.innerHTML += `
-          <tr>
-            <td class="border px-3 py-2">${a.nome}</td>
-            <td class="border px-3 py-2">${dataFormatada}</td>
-            <td class="border px-3 py-2 text-center">
-              <a href="${a.url}" target="_blank"
-                 class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 text-xs">
-                 Baixar
-              </a>
-            </td>
-          </tr>
-        `;
-      });
-    }
-
-    function aplicarFiltro() {
-      const mes = document.getElementById("mes").value;
-      const ano = document.getElementById("ano").value;
-
-      const filtrados = arquivos.filter(a => {
-        const data = new Date(a.data_upload);
-        const m = String(data.getMonth() + 1).padStart(2, '0');
-        const y = String(data.getFullYear());
-
-        return (mes === "" || m === mes) && (ano === "" || y === ano);
-      });
-
-      renderTabela(filtrados);
     }
 
     carregarArquivos();
   </script>
-
 </body>
 </html>
