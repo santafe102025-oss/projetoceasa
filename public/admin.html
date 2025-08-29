@@ -61,42 +61,46 @@
   <script>
     // Carregar empresas no select e na tabela
     async function carregarEmpresas() {
-      const res = await fetch('/empresas.json'); // rota corrigida
-      const empresas = await res.json();
+      try {
+        const res = await fetch('/empresas'); // rota correta
+        if (!res.ok) throw new Error("Erro ao buscar empresas");
+        const empresas = await res.json();
 
-      // Preencher select
-      const select = document.getElementById('empresaSelect');
-      select.innerHTML = "";
-      empresas.forEach(e => {
-        const option = document.createElement('option');
-        option.value = e.id;
-        option.textContent = `${e.nome} - CNPJ: ${e.cnpj} - Box: ${e.box}`;
-        select.appendChild(option);
-      });
+        // Preencher select
+        const select = document.getElementById('empresaSelect');
+        select.innerHTML = "";
+        empresas.forEach(e => {
+          const option = document.createElement('option');
+          option.value = e.id;
+          option.textContent = `${e.nome} - CNPJ: ${e.cnpj} - Box: ${e.box}`;
+          select.appendChild(option);
+        });
 
-      // Preencher tabela
-      const tabela = document.getElementById('tabelaEmpresas');
-      tabela.innerHTML = "";
-      empresas.forEach(e => {
-        tabela.innerHTML += `
-          <tr>
-            <td class="border px-3 py-2">${e.id}</td>
-            <td class="border px-3 py-2">${e.nome}</td>
-            <td class="border px-3 py-2">${e.cnpj}</td>
-            <td class="border px-3 py-2">${e.box}</td>
-            <td class="border px-3 py-2">${e.email || ''}</td>
-            <td class="border px-3 py-2 text-center">
-              <button 
-                onclick="excluirEmpresa(${e.id})"
-                class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 text-xs">
-                Excluir
-              </button>
-            </td>
-          </tr>
-        `;
-      });
+        // Preencher tabela
+        const tabela = document.getElementById('tabelaEmpresas');
+        tabela.innerHTML = "";
+        empresas.forEach(e => {
+          tabela.innerHTML += `
+            <tr>
+              <td class="border px-3 py-2">${e.id}</td>
+              <td class="border px-3 py-2">${e.nome}</td>
+              <td class="border px-3 py-2">${e.cnpj}</td>
+              <td class="border px-3 py-2">${e.box}</td>
+              <td class="border px-3 py-2">${e.email || ''}</td>
+              <td class="border px-3 py-2 text-center">
+                <button 
+                  onclick="excluirEmpresa(${e.id})"
+                  class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 text-xs">
+                  Excluir
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (err) {
+        alert("Erro ao carregar empresas: " + err.message);
+      }
     }
-    carregarEmpresas();
 
     // Função para excluir empresa
     async function excluirEmpresa(id) {
@@ -107,7 +111,8 @@
         alert("Empresa excluída com sucesso!");
         carregarEmpresas();
       } else {
-        alert("Erro ao excluir empresa.");
+        const msg = await resp.text();
+        alert("Erro ao excluir empresa: " + msg);
       }
     }
 
@@ -133,9 +138,13 @@
         });
         const msg = await resp.text();
         document.getElementById('uploadMsg').innerText = msg;
+        carregarEmpresas(); // atualiza tabela
       };
       reader.readAsDataURL(file);
     });
+
+    // Carregar ao iniciar
+    carregarEmpresas();
   </script>
 
 </body>

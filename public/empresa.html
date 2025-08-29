@@ -22,9 +22,54 @@
   <main class="flex-1 max-w-5xl mx-auto mt-8 p-6 bg-white shadow-lg rounded-2xl">
     <h2 class="text-2xl font-semibold text-green-700 mb-6">📂 Arquivos da sua empresa</h2>
 
-    <!-- Lista de arquivos -->
-    <div id="lista-arquivos" class="space-y-4">
-      <p class="text-gray-500">Carregando arquivos...</p>
+    <!-- Filtros -->
+    <div class="flex flex-wrap gap-4 mb-6">
+      <div>
+        <label for="mes" class="block text-gray-700 mb-1">Mês</label>
+        <select id="mes" class="border rounded-lg px-3 py-2">
+          <option value="">Todos</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div>
+        <label for="ano" class="block text-gray-700 mb-1">Ano</label>
+        <select id="ano" class="border rounded-lg px-3 py-2">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button onclick="aplicarFiltro()" 
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+          Filtrar
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="overflow-x-auto">
+      <table class="w-full border text-sm">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="border px-3 py-2 text-left">Nome</th>
+            <th class="border px-3 py-2 text-left">Data de Upload</th>
+            <th class="border px-3 py-2 text-center">Download</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaArquivos">
+          <tr><td colspan="3" class="text-center py-3">Carregando arquivos...</td></tr>
+        </tbody>
+      </table>
     </div>
   </main>
 
@@ -33,38 +78,74 @@
     <p>© 2025 CEASA - Sistema de Empresas</p>
   </footer>
 
-  <!-- Script para buscar os arquivos -->
+  <!-- Script -->
   <script>
+    let arquivos = [];
+
     async function carregarArquivos() {
       try {
         const res = await fetch("/arquivos");
         if (!res.ok) throw new Error("Erro ao carregar arquivos");
 
-        const arquivos = await res.json();
-        const lista = document.getElementById("lista-arquivos");
-        lista.innerHTML = "";
+        arquivos = await res.json();
 
-        if (arquivos.length === 0) {
-          lista.innerHTML = "<p class='text-gray-500'>Nenhum arquivo disponível no momento.</p>";
-          return;
-        }
-
-        arquivos.forEach(arq => {
-          const item = document.createElement("div");
-          item.className = "flex items-center justify-between bg-gray-100 p-4 rounded-lg shadow";
-          item.innerHTML = `
-            <span class="text-gray-700 font-medium">${arq.nome}</span>
-            <a href="${arq.url}" target="_blank" 
-               class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
-               Baixar
-            </a>
-          `;
-          lista.appendChild(item);
+        // Preencher anos disponíveis no filtro
+        const anos = [...new Set(arquivos.map(a => new Date(a.data_upload).getFullYear()))];
+        const selectAno = document.getElementById("ano");
+        anos.sort().forEach(ano => {
+          const opt = document.createElement("option");
+          opt.value = ano;
+          opt.textContent = ano;
+          selectAno.appendChild(opt);
         });
+
+        renderTabela(arquivos);
       } catch (err) {
-        document.getElementById("lista-arquivos").innerHTML =
-          "<p class='text-red-500'>Erro ao carregar arquivos.</p>";
+        document.getElementById("tabelaArquivos").innerHTML =
+          `<tr><td colspan="3" class="text-center text-red-500 py-3">Erro ao carregar arquivos.</td></tr>`;
       }
+    }
+
+    function renderTabela(lista) {
+      const tabela = document.getElementById("tabelaArquivos");
+      tabela.innerHTML = "";
+      if (lista.length === 0) {
+        tabela.innerHTML = `<tr><td colspan="3" class="text-center py-3">Nenhum arquivo encontrado</td></tr>`;
+        return;
+      }
+
+      lista.forEach(a => {
+        const data = new Date(a.data_upload);
+        const dataFormatada = data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+        tabela.innerHTML += `
+          <tr>
+            <td class="border px-3 py-2">${a.nome}</td>
+            <td class="border px-3 py-2">${dataFormatada}</td>
+            <td class="border px-3 py-2 text-center">
+              <a href="${a.url}" target="_blank"
+                 class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 text-xs">
+                 Baixar
+              </a>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function aplicarFiltro() {
+      const mes = document.getElementById("mes").value;
+      const ano = document.getElementById("ano").value;
+
+      const filtrados = arquivos.filter(a => {
+        const data = new Date(a.data_upload);
+        const m = String(data.getMonth() + 1).padStart(2, '0');
+        const y = String(data.getFullYear());
+
+        return (mes === "" || m === mes) && (ano === "" || y === ano);
+      });
+
+      renderTabela(filtrados);
     }
 
     carregarArquivos();
