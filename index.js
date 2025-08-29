@@ -72,16 +72,16 @@ app.get("/admin", adminMiddleware, (req, res) => {
 });
 
 // ======================
-// CADASTRO E LOGIN
+// CADASTRO DE EMPRESA
 // ======================
 app.post("/cadastro", async (req, res) => {
-  const { nome, cnpj, box, email, senha } = req.body;
+  const { nome, cnpj, box, usuario, senha } = req.body;
   try {
     const hash = await bcrypt.hash(senha, 10);
 
     const { error: insertError } = await supabase
       .from("empresas")
-      .insert([{ nome, cnpj, box, email, senha: hash }]);
+      .insert([{ nome, cnpj, box, usuario, senha: hash }]);
 
     if (insertError) {
       console.error("Erro ao cadastrar empresa:", insertError.message);
@@ -110,23 +110,32 @@ app.post("/cadastro", async (req, res) => {
   }
 });
 
+// ======================
+// LOGIN
+// ======================
 app.post("/login", async (req, res) => {
-  const { email, senha } = req.body;
+  const { usuario, cnpj, senha } = req.body;
 
   // Login administrador fixo
-  if (email === "admin@ceasa.com" && senha === "ceasa123") {
+  if (usuario === "admin" && senha === "ceasa123") {
     req.session.isAdmin = true;
     return res.redirect("/admin");
   }
 
   try {
-    const { data: empresas, error } = await supabase
-      .from("empresas")
-      .select("*")
-      .eq("email", email)
-      .limit(1);
+    let query = supabase.from("empresas").select("*").limit(1);
 
-    if (error || empresas.length === 0) {
+    if (usuario) {
+      query = query.eq("usuario", usuario);
+    } else if (cnpj) {
+      query = query.eq("cnpj", cnpj);
+    } else {
+      return res.status(400).send("Informe usuário ou CNPJ.");
+    }
+
+    const { data: empresas, error } = await query;
+
+    if (error || !empresas || empresas.length === 0) {
       return res.status(401).send("Credenciais inválidas.");
     }
 
@@ -147,111 +156,13 @@ app.post("/login", async (req, res) => {
 });
 
 // ======================
-// UPLOAD & LISTAGEM
-// ======================
-app.post("/upload/:empresaId", adminMiddleware, async (req, res) => {
-  const empresaId = req.params.empresaId;
-  const { nomeArquivo, conteudo } = req.body;
-
-  try {
-    const { data: empresas } = await supabase
-      .from("empresas")
-      .select("*")
-      .eq("id", empresaId)
-      .limit(1);
-
-    if (!empresas || empresas.length === 0) {
-      return res.status(404).send("Empresa não encontrada.");
-    }
-    const empresa = empresas[0];
-
-    const bucket = "arquivos";
-    const caminho = `${empresa.cnpj}/${nomeArquivo}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(caminho, Buffer.from(conteudo, "base64"), {
-        contentType: nomeArquivo.endsWith(".pdf")
-          ? "application/pdf"
-          : "application/octet-stream",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Erro no upload:", uploadError.message);
-      return res.status(500).send("Erro ao enviar arquivo.");
-    }
-
-    const { error: insertError } = await supabase
-      .from("arquivos")
-      .insert([{ empresa_id: empresaId, nome: nomeArquivo, caminho }]);
-
-    if (insertError) {
-      console.error("Erro ao salvar metadados:", insertError.message);
-    }
-
-    res.send("Arquivo enviado com sucesso.");
-  } catch (err) {
-    console.error("Erro no upload:", err.message);
-    res.status(500).send("Erro interno.");
-  }
-});
-
-// 🔥 Listagem com filtro por mês/ano
-app.get("/arquivos", authMiddleware, async (req, res) => {
-  try {
-    if (req.session.isAdmin) return res.status(403).send("Somente empresas acessam.");
-
-    const empresaId = req.session.userId;
-    const { mes, ano } = req.query;
-
-    let { data: arquivos, error } = await supabase
-      .from("arquivos")
-      .select("*")
-      .eq("empresa_id", empresaId)
-      .order("data_upload", { ascending: false });
-
-    if (error) {
-      console.error("Erro ao buscar arquivos:", error.message);
-      return res.status(500).send("Erro interno.");
-    }
-
-    // Aplica filtro se solicitado
-    if (mes || ano) {
-      arquivos = arquivos.filter((arq) => {
-        const data = new Date(arq.data_upload);
-        const m = String(data.getMonth() + 1).padStart(2, "0");
-        const y = String(data.getFullYear());
-        return (!mes || m === mes) && (!ano || y === ano);
-      });
-    }
-
-    // Gera URLs assinadas
-    const arquivosComUrls = await Promise.all(
-      arquivos.map(async (arquivo) => {
-        const { data, error } = await supabase.storage
-          .from("arquivos")
-          .createSignedUrl(arquivo.caminho, 60 * 60);
-
-        return { ...arquivo, url: data?.signedUrl || null };
-      })
-    );
-
-    res.json(arquivosComUrls);
-  } catch (err) {
-    console.error("Erro ao listar arquivos:", err.message);
-    res.status(500).send("Erro interno.");
-  }
-});
-
-// ======================
 // LISTAR EMPRESAS (para admin)
 // ======================
 app.get("/empresas", adminMiddleware, async (req, res) => {
   try {
     const { data: empresas, error } = await supabase
       .from("empresas")
-      .select("id, nome, cnpj, box, email");
+      .select("id, nome, cnpj, box, usuario");
 
     if (error) throw error;
 
@@ -259,19 +170,6 @@ app.get("/empresas", adminMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Erro ao listar empresas:", err.message);
     res.status(500).send("Erro ao buscar empresas.");
-  }
-});
-
-app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
-  const { id } = req.params;
-  try {
-    await supabase.from("arquivos").delete().eq("empresa_id", id);
-    await supabase.from("empresas").delete().eq("id", id);
-
-    res.send("Empresa excluída com sucesso");
-  } catch (err) {
-    console.error("Erro ao excluir empresa:", err.message);
-    res.status(500).send("Erro ao excluir empresa");
   }
 });
 
