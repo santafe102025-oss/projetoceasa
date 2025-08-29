@@ -3,75 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cadastro - Sistema CEASA</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #006400, #228B22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      text-align: center;
-      max-width: 450px;
-      width: 100%;
-    }
-    h1 {
-      color: #006400;
-      margin-bottom: 20px;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      background: #006400;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background: #228B22;
-    }
-    a {
-      display: block;
-      margin-top: 15px;
-      color: #006400;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
+  <title>Cadastro - CEASA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <h1>Cadastro de Empresa</h1>
-    <form method="POST" action="/cadastro">
-      <input type="text" name="nome" placeholder="Nome da Empresa" required>
-      <input type="text" name="cnpj" placeholder="CNPJ" required>
-      <input type="text" name="box" placeholder="Número do Box" required>
-      <input type="email" name="email" placeholder="E-mail" required>
-      <input type="password" name="senha" placeholder="Senha" required>
-      <button type="submit">Cadastrar</button>
+<body class="bg-green-50 flex items-center justify-center min-h-screen">
+
+  <div class="bg-white shadow-2xl rounded-2xl w-full max-w-lg p-8">
+    <!-- Título -->
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-green-700">🌱 CEASA</h1>
+      <p class="text-gray-500 mt-2">Cadastro da Empresa</p>
+    </div>
+
+    <!-- Formulário -->
+    <form action="/cadastro" method="POST" class="space-y-4">
+      
+      <!-- Nome -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Nome da Empresa</label>
+        <input type="text" name="nome" required
+          placeholder="Ex: Hortifruti São José"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
+
+      <!-- CNPJ -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">CNPJ</label>
+        <input type="text" name="cnpj" required
+          placeholder="00.000.000/0000-00"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
+
+      <!-- Box -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Número do Box</label>
+        <input type="text" name="box" required
+          placeholder="Ex: Box 23"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
+
+      <!-- Usuário -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Usuário <span class="text-gray-400">(opcional)</span></label>
+        <input type="text" name="usuario"
+          placeholder="Crie um usuário (se preferir)"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
+
+      <!-- Senha -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Senha</label>
+        <input type="password" name="senha" required
+          placeholder="Digite uma senha segura"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring focus:ring-green-300">
+      </div>
+
+      <!-- Botão -->
+      <button type="submit"
+        class="w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700 transition">
+        Cadastrar
+      </button>
     </form>
-    <a href="/">Já possui conta? Faça login</a>
+
+    <!-- Link para login -->
+    <p class="text-center text-sm text-gray-600 mt-6">
+      Já tem conta? 
+      <a href="/login" class="text-green-600 hover:underline">Faça login</a>
+    </p>
   </div>
+
 </body>
 </html>
