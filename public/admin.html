@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Painel Administrador - CEASA</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SDK do Supabase -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
@@ -59,10 +61,15 @@
   </main>
 
   <script>
+    // 🔑 Configuração do Supabase (use suas variáveis do Render)
+    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+    const SUPABASE_KEY = "SEU_PUBLIC_ANON_KEY";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     // Carregar empresas no select e na tabela
     async function carregarEmpresas() {
       try {
-        const res = await fetch('/empresas'); // rota correta
+        const res = await fetch('/empresas');
         if (!res.ok) throw new Error("Erro ao buscar empresas");
         const empresas = await res.json();
 
@@ -116,31 +123,33 @@
       }
     }
 
-    // Upload de arquivo
+    // Upload de arquivo direto no Supabase
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const empresaId = document.getElementById('empresaSelect').value;
       const file = document.getElementById('arquivo').files[0];
+      const msgEl = document.getElementById('uploadMsg');
+
       if (!file) {
         alert('Selecione um arquivo PDF.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const conteudoBase64 = reader.result.split(',')[1];
-        const resp = await fetch(`/upload/${empresaId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nomeArquivo: file.name,
-            conteudo: conteudoBase64
-          })
-        });
-        const msg = await resp.text();
-        document.getElementById('uploadMsg').innerText = msg;
-        carregarEmpresas(); // atualiza tabela
-      };
-      reader.readAsDataURL(file);
+
+      // Nome do arquivo no bucket
+      const filePath = `${empresaId}/${Date.now()}-${file.name}`;
+
+      // Upload no Supabase
+      const { error } = await supabase.storage
+        .from('arquivos')
+        .upload(filePath, file);
+
+      if (error) {
+        msgEl.innerText = "❌ Erro ao enviar arquivo: " + error.message;
+        msgEl.className = "text-red-600";
+      } else {
+        msgEl.innerText = "✅ Arquivo enviado com sucesso!";
+        msgEl.className = "text-green-600";
+      }
     });
 
     // Carregar ao iniciar
