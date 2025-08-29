@@ -75,7 +75,6 @@ app.get("/cadastro", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "cadastro.html"));
 });
 
-
 // ======================
 // CADASTRO DE EMPRESA
 // ======================
@@ -175,6 +174,53 @@ app.get("/empresas", adminMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Erro ao listar empresas:", err.message);
     res.status(500).send("Erro ao buscar empresas.");
+  }
+});
+
+// ======================
+// EXCLUIR EMPRESA (para admin)
+// ======================
+app.delete("/empresas/:id", adminMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Buscar empresa para pegar CNPJ
+    const { data: empresa, error: selectError } = await supabase
+      .from("empresas")
+      .select("id, cnpj")
+      .eq("id", id)
+      .single();
+
+    if (selectError || !empresa) {
+      return res.status(404).send("Empresa não encontrada.");
+    }
+
+    // Excluir empresa do banco
+    const { error: deleteError } = await supabase
+      .from("empresas")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) throw deleteError;
+
+    // Excluir pasta da empresa no Storage
+    const bucket = "arquivos";
+    const prefix = `${empresa.cnpj}/`;
+
+    // Lista os arquivos
+    const { data: arquivos, error: listError } = await supabase.storage
+      .from(bucket)
+      .list(prefix, { limit: 1000 });
+
+    if (!listError && arquivos.length > 0) {
+      const paths = arquivos.map((arq) => `${prefix}${arq.name}`);
+      await supabase.storage.from(bucket).remove(paths);
+    }
+
+    res.json({ message: "Empresa e arquivos excluídos com sucesso!" });
+  } catch (err) {
+    console.error("Erro ao excluir empresa:", err.message);
+    res.status(500).send("Erro ao excluir empresa.");
   }
 });
 

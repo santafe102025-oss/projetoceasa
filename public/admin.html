@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel Administrador - CEASA</title>
@@ -53,7 +52,7 @@
             <th class="border px-3 py-2">Nome</th>
             <th class="border px-3 py-2">CNPJ</th>
             <th class="border px-3 py-2">Box</th>
-            <th class="border px-3 py-2">Email</th>
+            <th class="border px-3 py-2">Usuário</th>
             <th class="border px-3 py-2">Ações</th>
           </tr>
         </thead>
@@ -63,7 +62,7 @@
   </main>
 
   <script>
-    // 🔑 Configuração do Supabase (use suas variáveis do Render)
+    // 🔑 Configuração do Supabase (se precisar usar upload direto)
     const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
     const SUPABASE_KEY = "SEU_PUBLIC_ANON_KEY";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -95,7 +94,7 @@
               <td class="border px-3 py-2">${e.nome}</td>
               <td class="border px-3 py-2">${e.cnpj}</td>
               <td class="border px-3 py-2">${e.box}</td>
-              <td class="border px-3 py-2">${e.email || ''}</td>
+              <td class="border px-3 py-2">${e.usuario || ''}</td>
               <td class="border px-3 py-2 text-center">
                 <button 
                   onclick="excluirEmpresa(${e.id})"
